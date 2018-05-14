@@ -4148,7 +4148,7 @@
 // <e> NRF_CLI_HISTORY_ENABLED - Enable CLI history mode.
 //==========================================================
 #ifndef NRF_CLI_HISTORY_ENABLED
-#define NRF_CLI_HISTORY_ENABLED 1
+#define NRF_CLI_HISTORY_ENABLED 0
 #endif
 // <o> NRF_CLI_HISTORY_ELEMENT_SIZE - Size of one memory object reserved for CLI history 
 #ifndef NRF_CLI_HISTORY_ELEMENT_SIZE
@@ -4173,7 +4173,7 @@
  
 
 #ifndef NRF_CLI_LOG_BACKEND
-#define NRF_CLI_LOG_BACKEND 1
+#define NRF_CLI_LOG_BACKEND 0
 #endif
 
 // <q> NRF_CLI_USES_TASK_MANAGER_ENABLED  - Enable CLI to use task_manager
@@ -4213,7 +4213,7 @@
 // <e> NRF_LOG_BACKEND_RTT_ENABLED - nrf_log_backend_rtt - Log RTT backend
 //==========================================================
 #ifndef NRF_LOG_BACKEND_RTT_ENABLED
-#define NRF_LOG_BACKEND_RTT_ENABLED 1
+#define NRF_LOG_BACKEND_RTT_ENABLED 0
 #endif
 // <o> NRF_LOG_BACKEND_RTT_TEMP_BUFFER_SIZE - Size of buffer for partially processed strings. 
 // <i> Size of the buffer is a trade-off between RAM usage and processing.
@@ -4278,7 +4278,7 @@
 // <e> NRF_LOG_ENABLED - Logging module for nRF5 SDK
 //==========================================================
 #ifndef NRF_LOG_ENABLED
-#define NRF_LOG_ENABLED 1
+#define NRF_LOG_ENABLED 0
 #endif
 // <e> NRF_LOG_USES_COLORS - If enabled then ANSI escape code for colors is prefixed to every string
 //==========================================================
@@ -4404,7 +4404,7 @@
  
 
 #ifndef NRF_LOG_CLI_CMDS
-#define NRF_LOG_CLI_CMDS 1
+#define NRF_LOG_CLI_CMDS 0
 #endif
 
 // <h> Log message pool - Configuration of log message pool
