@@ -1,1 +1,2 @@
-# nrf52_ble_mpu6050_simple
+# sensortagr40
+Firmware for the new SensorTagR40 from Infor-link
