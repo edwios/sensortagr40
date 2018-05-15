@@ -68,7 +68,7 @@ uint32_t mpu_sleep(bool sleepmode)
     uint8_t raw_value;
     uint8_t MPU9050_SLEEPMASK=0x40;
 
-    if (!sleepmode) nrf_drv_spi_enable();
+//    if (!sleepmode) nrf_drv_spi_enable();
 
     // Read MPU Power Mgmt register, OR with 0x40
     err_code = nrf_drv_mpu_read_registers(MPU_REG_PWR_MGMT_1, &raw_value, 1);
@@ -79,7 +79,7 @@ uint32_t mpu_sleep(bool sleepmode)
     err_code = nrf_drv_mpu_write_single_register(MPU_REG_PWR_MGMT_1, raw_value);
     if(err_code != NRF_SUCCESS) return err_code;
 
-    if (sleepmode) nrf_drv_spi_disable();
+//    if (sleepmode) nrf_drv_spi_disable();
 
     return NRF_SUCCESS;
 

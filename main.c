@@ -87,20 +87,22 @@
 #include "app_uart.h"
 #include "app_util_platform.h"
 #include "app_mpu.h"
-#include "ble_mpu.h"
 #include "app_ap3216c.h"
+#include "app_bmp280.h"
+#include "ble_mpu.h"
 #include "ble_ap3216c.h"
+#include "ble_bmp280.h"
 
 #define APP_FEATURE_NOT_SUPPORTED       BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2    /**< Reply when unsupported features are requested. */
 
-#define DEVICE_NAME                     "LumiMultiNG"                         /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "EnvMulti"                         /**< Name of device. Will be included in the advertising data. */
 #define MANUFACTURER_NAME               "ioStation Ltd."                        /**< Manufacturer. Will be passed to Device Information Service. */
 #define MODEL_NUM                       "HYP-AT1A"                              /**< Model number. Will be passed to Device Information Service. */
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
 //#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
-#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      0                                     /**< The advertising timeout in units of seconds. */
 
 #define APP_BLE_OBSERVER_PRIO           1                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
@@ -124,7 +126,7 @@
 #define SEC_PARAM_MIN_KEY_SIZE          7                                       /**< Minimum encryption key size. */
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
-#define TEMP_TYPE_AS_CHARACTERISTIC     0                                           /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
+#define TEMP_TYPE_AS_CHARACTERISTIC     1                                           /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
@@ -147,9 +149,11 @@ static bool     m_hts_meas_ind_conf_pending = false;                            
 
 ble_mpu_t m_mpu;
 ble_ap3216c_t m_ap3216c;
+ble_bmp280_t m_bmp280;
 bool start_accel_update_flag = false;
 temp_value_t m_temp_value;
 ap3216c_ambient_values_t m_ambient;
+bmp280_ambient_values_t m_bmpambient;
 
 /* YOUR_JOB: Declare all services structure your application is using
  *  BLE_XYZ_DEF(m_xyz);
@@ -488,6 +492,7 @@ static void services_init(void)
 */
     ble_mpu_service_init(&m_mpu);
     ble_ap3216c_service_init(&m_ap3216c);
+    ble_bmp280_service_init(&m_bmp280);
     
     // Initialize Health Thermometer Service
     memset(&hts_init, 0, sizeof(hts_init));
@@ -1244,6 +1249,11 @@ int main(void)
                     NRF_LOG_INFO("Ambient: Vis %d, IR %d", m_ambient.ambient_visible_value, m_ambient.ambient_ir_value);
                     ble_ap3216c_update(&m_ap3216c, &m_ambient);
                 }
+                if (bmp280_has_new_data()) {
+                    bmp280_read_ambient(&m_bmpambient);
+                    NRF_LOG_INFO("Ambient: Temp %d, Humi %d, Pres %d", m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                    ble_bmp280_update(&m_bmp280, &m_bmpambient);
+                }
                 delta_accel = ((accel_values.x-last_accel_values.x)*(accel_values.x-last_accel_values.x))+((accel_values.y-last_accel_values.y)*(accel_values.y-last_accel_values.y))+((accel_values.z-last_accel_values.z)*(accel_values.z-last_accel_values.z));
                 last_accel_values = accel_values;
 //                NRF_LOG_INFO("\033[2J\033[;HAccel: %05d, %05d, %05d\r\n", accel_values.x, accel_values.y, accel_values.z);
@@ -1254,7 +1264,6 @@ int main(void)
 //                NRF_LOG_INFO("Accel: %02x, %02x, %02x, %02x, %02x, %02x\r\n", (uint8_t)(accel_values.x >> 8), (uint8_t)accel_values.x, (uint8_t)(accel_values.y >> 8), (uint8_t)accel_values.y, (uint8_t)(accel_values.z >> 8), (uint8_t)accel_values.z);
                 NRF_LOG_FLUSH();
                 ble_mpu_update(&m_mpu, &accel_values);
-                ble_ap3216c_temperature_update(&m_ap3216c, &m_temp_value);
                 start_accel_update_flag = false;
                 //bsp_indication_set(BSP_INDICATE_IDLE);
                 //nrf_gpio_pin_toggle(LED_1);
