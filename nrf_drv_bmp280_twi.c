@@ -16,7 +16,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-static const nrf_drv_twi_t m_twi_instance = NRF_DRV_TWI_INSTANCE(1);
+static const nrf_drv_twi_t m_twi_instance = NRF_DRV_TWI_INSTANCE(0);
 volatile static bool twi_tx_done = false;
 volatile static bool twi_rx_done = false;
 
@@ -69,15 +69,15 @@ uint32_t nrf_drv_bmp280_init(void)
        .scl                = BMP280_TWI_SCL_PIN,
        .sda                = BMP280_TWI_SDA_PIN,
        .frequency          = NRF_TWI_FREQ_100K,
-       .interrupt_priority = APP_IRQ_PRIORITY_HIGHEST,
+       .interrupt_priority = APP_IRQ_PRIORITY_HIGH,
        .clear_bus_init      = true
     };
     
-    NRF_LOG_DEBUG("TWI init begin ..."); NRF_LOG_FLUSH();
+    //---NRF_LOG_DEBUG("TWI init begin ..."); //---NRF_LOG_FLUSH();
     err_code = nrf_drv_twi_init(&m_twi_instance, &twi_bmp280_config, nrf_drv_bmp280_twi_event_handler, NULL);
     if(err_code != NRF_SUCCESS && err_code != NRF_ERROR_INVALID_STATE)
 	{
-        NRF_LOG_DEBUG("TWI init error %d", err_code); NRF_LOG_FLUSH();
+        //---NRF_LOG_DEBUG("TWI init error %d", err_code); //---NRF_LOG_FLUSH();
 		return err_code;
 	}    
     nrf_drv_twi_enable(&m_twi_instance);
@@ -112,7 +112,7 @@ uint32_t nrf_drv_bmp280_read_registers(uint8_t reg, uint8_t * p_data, uint32_t l
     uint32_t err_code;
     uint32_t timeout = BMP280_TWI_TIMEOUT;
 
-    err_code = nrf_drv_twi_tx(&m_twi_instance, BMP280_ADDRESS, &reg, 1, false);
+    err_code = nrf_drv_twi_tx(&m_twi_instance, BMP280_ADDRESS, &reg, 1, true);
     if(err_code != NRF_SUCCESS) return err_code;
 
     while((!twi_tx_done) && --timeout);

@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 #include "app_bmp280.h"
 #include "nrf_gpio.h"
 #include "nrf_drv_bmp280_twi.h"
@@ -21,14 +22,22 @@
 uint32_t bmp280_config(void)
 {
     uint32_t err_code;
+    int16_t h4, h5;
+    uint8_t ch=0;
 
-    NRF_LOG_DEBUG("Configurating BMP280"); NRF_LOG_FLUSH();
-    err_code = nrf_drv_bmp280_write_single_register(BMP280_REGISTER_CONTROL, 0x3F);
+    //---//---NRF_LOGDEBUG("Configurating BMP280"); //---NRF_LOGFLUSH();
+    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_CTRL_HUM, &ch, 1);
+    ch &= 0xF8;
+    ch |= BMP280_PARAM_HUM_OVS1;
+    err_code = nrf_drv_bmp280_write_single_register(BMP280_REGISTER_CTRL_HUM, ch);
+    if(err_code != NRF_SUCCESS) return err_code;
+    err_code = nrf_drv_bmp280_write_single_register(BMP280_REGISTER_CONTROL, 0x6F);
     if(err_code != NRF_SUCCESS) return err_code;
 
     err_code = nrf_drv_bmp280_read_register16(BMP280_REGISTER_DIG_T1, &_bmp280_calib.dig_T1);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_T2, &_bmp280_calib.dig_T2);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_T3, &_bmp280_calib.dig_T3);
+//    //---NRF_LOGDEBUG("dig T1,2,3 %d, %d, %d", _bmp280_calib.dig_T1, _bmp280_calib.dig_T2, _bmp280_calib.dig_T3); //---NRF_LOGFLUSH();
 
     err_code = nrf_drv_bmp280_read_register16(BMP280_REGISTER_DIG_P1, &_bmp280_calib.dig_P1);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_P2, &_bmp280_calib.dig_P2);
@@ -39,6 +48,15 @@ uint32_t bmp280_config(void)
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_P7, &_bmp280_calib.dig_P7);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_P8, &_bmp280_calib.dig_P8);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_P9, &_bmp280_calib.dig_P9);
+
+    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_DIG_H1, &_bmp280_calib.dig_H1, 1);
+    err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_H2, &_bmp280_calib.dig_H2);
+    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_DIG_H3, &_bmp280_calib.dig_H3, 1);
+    err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_H4, &h4);
+    err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_H5, &h5);
+    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_DIG_H6, (uint8_t *)&_bmp280_calib.dig_H6, 1);
+    _bmp280_calib.dig_H4 = ((h4 & 0x00ff) << 4) | ((h4 & 0x0f00) >> 8);
+    _bmp280_calib.dig_H5 = (h5 >> 4);
 
     return NRF_SUCCESS;
 }
@@ -51,14 +69,14 @@ uint32_t bmp280_init(void)
     uint8_t chipid;
 	
 	// Initate TWI or SPI driver dependent on what is defined from the project
-    NRF_LOG_DEBUG("Initialising BMP280"); NRF_LOG_FLUSH();
+    //---NRF_LOGDEBUG("Initialising BMP280"); //---NRF_LOGFLUSH();
 	err_code = nrf_drv_bmp280_init();
     if(err_code != NRF_SUCCESS) return err_code;
 
     err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_CHIPID, &chipid, 1);
     if(err_code != NRF_SUCCESS) return err_code;
     if (chipid != BMP280_CHIPID) {
-        NRF_LOG_DEBUG("Init error: BMP280 not found!"); NRF_LOG_FLUSH();
+        //---NRF_LOGDEBUG("Init error: BMP280 not found!"); //---NRF_LOGFLUSH();
     }
     return NRF_SUCCESS;
 }
@@ -67,7 +85,15 @@ uint32_t bmp280_init(void)
 
 bool bmp280_has_new_data(void)
 {
-    return true;
+    uint32_t err_code;
+    uint8_t status;
+
+    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_STATUS, &status, 1);
+    if(err_code != NRF_SUCCESS) return err_code;
+    if (status & 0x08)
+        return true;
+    else
+        return false;
 }
 
 
@@ -75,17 +101,26 @@ bool bmp280_has_new_data(void)
 uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
 {
     uint32_t err_code;
-    uint8_t temperature_values[3];
-    uint8_t humidity_values[3];
-    uint8_t pressure_values[3];
-    int32_t var1, var2, t_fine, h;
+    uint8_t env_values[8];
+    uint8_t *temperature_values;
+    uint8_t *pressure_values;
+    int32_t var1, var2, t_fine;
     int64_t v1, v2, p;
+/** BME280 only
+    uint8_t *humidity_values;
+    int32_t h;
+**/
 
-
-    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_TEMPDATA, temperature_values, 3);
+    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_PRESSUREDATA, env_values, 8);
     if(err_code != NRF_SUCCESS) return err_code;
+    pressure_values = (uint8_t *)env_values;
+    temperature_values = (uint8_t *)(env_values+3*sizeof(uint8_t));
+//    humidity_values = (uint8_t *)(env_values+6*sizeof(uint8_t));
 
-    int32_t adc_T = (temperature_values[2] << 16) + (temperature_values[1] << 8) + temperature_values[0];
+//    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_TEMPDATA, temperature_values, 3);
+//    if(err_code != NRF_SUCCESS) return err_code;
+
+    int32_t adc_T = ((temperature_values[0] << 16) + (temperature_values[1] << 8) + (temperature_values[2] & 0xF0))/16;
     var1  = ((((adc_T>>3) - ((int32_t)_bmp280_calib.dig_T1 <<1))) *
         ((int32_t)_bmp280_calib.dig_T2)) >> 11;
     var2  = (((((adc_T>>4) - ((int32_t)_bmp280_calib.dig_T1)) *
@@ -94,10 +129,10 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     t_fine = var1 + var2;
     bmp280_ambient_values->ambient_temperature_value = (t_fine * 5 + 128) >> 8;
 
-    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_PRESSUREDATA, pressure_values, 3);
-    if(err_code != NRF_SUCCESS) return err_code;
+//    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_PRESSUREDATA, pressure_values, 3);
+//    if(err_code != NRF_SUCCESS) return err_code;
 
-    int32_t adc_P = (pressure_values[2] << 16) + (pressure_values[1] << 8) + pressure_values[0];
+    int32_t adc_P = ((pressure_values[0] << 16) + (pressure_values[1] << 8) + (pressure_values[2] & 0xF0))/16;
     adc_P >>= 4;
     v1 = ((int64_t)t_fine) - 128000;
     v2 = v1 * v1 * (int64_t)_bmp280_calib.dig_P6;
@@ -118,9 +153,38 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     p = ((p + v1 + v2) >> 8) + (((int64_t)_bmp280_calib.dig_P7)<<4);
     bmp280_ambient_values->ambient_pressure_value = p/256;
 
-    humidity_values[2] = 0; humidity_values[1] = 0; humidity_values[0]=0;
-    h = (humidity_values[2] << 16) + (humidity_values[1] << 8) + humidity_values[0];
-    bmp280_ambient_values->ambient_humidity_value = h;
+    /** For BME280 only **/
+   
+//    int32_t adc_H = (humidity_values[0] << 8) + humidity_values[1];
+
+/** floating point math
+double var_H;
+   
+var_H = (((double)t_fine) - 76800.0);
+var_H = (adc_H - (((double)_bmp280_calib.dig_H4) * 64.0 + ((double)_bmp280_calib.dig_H5) / 16384.0 * var_H)) *
+(((double)_bmp280_calib.dig_H2) / 65536.0 * (1.0 + ((double)_bmp280_calib.dig_H6) / 67108864.0 * var_H *
+(1.0 + ((double)_bmp280_calib.dig_H3) / 67108864.0 * var_H)));
+var_H = var_H * (1.0 - ((double)_bmp280_calib.dig_H1) * var_H / 524288.0);
+   if (var_H > 100.0)
+       var_H = 100.0;
+   else if (var_H < 0.0)
+       var_H = 0.0;
+
+h = (int16_t)round((var_H * 100));
+*/
+/** Integer math
+    h = (t_fine - ((int32_t)76800));
+    h = (((((adc_H << 14) - (((int32_t)_bmp280_calib.dig_H4) << 20) - (((int32_t)_bmp280_calib.dig_H5) * h)) +
+    ((int32_t)16384)) >> 15) * (((((((h * ((int32_t)_bmp280_calib.dig_H6)) >> 10) * (((h *
+    ((int32_t)_bmp280_calib.dig_H3)) >> 11) + ((int32_t)32768))) >> 10) + ((int32_t)2097152)) *
+    ((int32_t)_bmp280_calib.dig_H2) + 8192) >> 14));
+    h = (h - (((((h >> 15) * (h >> 15)) >> 7) *
+                              ((int32_t)_bmp280_calib.dig_H1)) >> 4));
+    h = (h < 0 ? 0 : h);
+    h = (h > 419430400 ? 419430400 : h);
+*/
+
+    bmp280_ambient_values->ambient_humidity_value = 0;
 
     return NRF_SUCCESS;
 }
@@ -153,13 +217,13 @@ uint32_t bmp280_read_lux(uint32_t * lux)
 }
 */
 
-uint32_t bmp280_read_partid(bmp280_part_id_t * partid)
+uint32_t bmp280_read_partid(uint8_t * partid)
 {
     uint32_t err_code;
-    uint8_t raw_values;
-    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_CHIPID, &raw_values, 1);
+    uint8_t raw_value=0;
+    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_CHIPID, &raw_value, 1);
     if(err_code != NRF_SUCCESS) return err_code;
-
+    *partid = raw_value;
     return NRF_SUCCESS;
 }
 
@@ -167,12 +231,19 @@ uint32_t bmp280_read_partid(bmp280_part_id_t * partid)
 
 uint32_t bmp280_config_activate(void)
 {
+    uint32_t err_code;
 
+    err_code = nrf_drv_bmp280_write_single_register(BMP280_REGISTER_CONTROL, 0x6F);
+    if(err_code != NRF_SUCCESS) return err_code;
     return NRF_SUCCESS;
 }
 
 uint32_t bmp280_config_deactivate(void)
 {
+    uint32_t err_code;
+
+    err_code = nrf_drv_bmp280_write_single_register(BMP280_REGISTER_CONTROL, 0x6C);
+    if(err_code != NRF_SUCCESS) return err_code;
 
     return NRF_SUCCESS;
 }

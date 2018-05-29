@@ -72,7 +72,7 @@ static uint32_t ble_char_temperature_add(ble_bmp280_t * p_bmp280)
     uint8_t value[2]            = {0};
     attr_char_value.p_value     = value;
 
-//    NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); NRF_LOG_FLUSH();
+//    //---NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); //---NRF_LOG_FLUSH();
     err_code = sd_ble_gatts_characteristic_add(p_bmp280->service_handle,
                                        &char_md,
                                        &attr_char_value,
@@ -117,7 +117,7 @@ static uint32_t ble_char_humidity_add(ble_bmp280_t * p_bmp280)
     uint8_t value[2]            = {0};
     attr_char_value.p_value     = value;
 
-//    NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); NRF_LOG_FLUSH();
+//    //---NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); //---NRF_LOG_FLUSH();
     err_code = sd_ble_gatts_characteristic_add(p_bmp280->service_handle,
                                        &char_md,
                                        &attr_char_value,
@@ -162,7 +162,7 @@ static uint32_t ble_char_pressure_add(ble_bmp280_t * p_bmp280)
     uint8_t value[2]            = {0};
     attr_char_value.p_value     = value;
 
-//    NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); NRF_LOG_FLUSH();
+//    //---NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); //---NRF_LOG_FLUSH();
     err_code = sd_ble_gatts_characteristic_add(p_bmp280->service_handle,
                                        &char_md,
                                        &attr_char_value,
@@ -208,7 +208,7 @@ static uint32_t ble_char_altitide_add(ble_bmp280_t * p_bmp280)
     uint8_t value[2]            = {0};
     attr_char_value.p_value     = value;
 
-//    NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); NRF_LOG_FLUSH();
+//    //---NRF_LOG_DEBUG("ble_char_accel_add: add gatt char"); //---NRF_LOG_FLUSH();
     err_code = sd_ble_gatts_characteristic_add(p_bmp280->service_handle,
                                        &char_md,
                                        &attr_char_value,
@@ -272,6 +272,7 @@ void ble_bmp280_update(ble_bmp280_t *p_bmp280, bmp280_ambient_values_t * bmp280_
         hvx_params.offset = 0;
         hvx_params.p_len  = &len;
         hvx_params.p_data = (uint8_t*)&temperature_value;  
+//---NRF_LOG_DEBUG("BLE BMP280 temp %d", temperature_value); //---NRF_LOG_FLUSH();
 
         sd_ble_gatts_hvx(p_bmp280->conn_handle, &hvx_params);
  
@@ -299,7 +300,7 @@ void ble_bmp280_update(ble_bmp280_t *p_bmp280, bmp280_ambient_values_t * bmp280_
         hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
         hvx_params.offset = 0;
         hvx_params.p_len  = &len;
-        hvx_params.p_data = (uint8_t*)temperature_value;  
+        hvx_params.p_data = (uint8_t*)altitude_value;  
         sd_ble_gatts_hvx(p_bmp280->conn_handle, &hvx_params);
 #endif
     } 

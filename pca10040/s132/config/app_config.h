@@ -14,16 +14,17 @@
 #define BLE_DIS_ENABLED 1
 
 #define TWI_ENABLED 1
+#define TWI_DEFAULT_CONFIG_CLR_BUS_INIT 1
+
 #define TWI0_ENABLED 1
 #define TWI0_USE_EASY_DMA 1
-#define TWI_DEFAULT_CONFIG_CLR_BUS_INIT 1
 
 #define TWI1_ENABLED 1
 #define TWI1_USE_EASY_DMA 1
 
-#define SPI_ENABLED 1
+#define SPI_ENABLED 0
 //#define SPI0_ENABLED 1
-#define SPI2_ENABLED 1
+#define SPI2_ENABLED 0
 #define NRF_SPI_DRV_MISO_PULLUP_CFG 3		// Need to configure from 14.1
 
 #define TIMER_ENABLED 1
@@ -36,13 +37,16 @@
 
 #define BUTTON_ENABLED 1
 
-#define NRF_CLI_ENABLED 0
-#define NRF_CLI_ECHO_STATUS 0				// Need to configure from 14.1
-#define NRF_LOG_BACKEND_SERIAL_USES_RTT 1
+#define NRF_LOG_ENABLED 1					// Use Log
+#define NRF_LOG_DEFERRED 1					// Buffered, may need to increase buffer size
+// <0=> SKIP 
+// <1=> TRIM 
+// <2=> BLOCK_IF_FIFO_FULL 
+#define SEGGER_RTT_CONFIG_DEFAULT_MODE 0
+#define NRF_LOG_BACKEND_SERIAL_USES_RTT 1	// 1 if RTT Log
+#define NRF_LOG_BACKEND_RTT_ENABLED 1		// 1 if RTT Log
 #define NRF_LOG_BACKEND_UART_ENABLED 0		// Must be disabled or uart_init() will fail with err_code 8
-#define NRF_LOG_BACKEND_RTT_ENABLED 1
-#define NRF_LOG_ENABLED 1
-#define NRF_LOG_DEFERRED 1
+
 #define NRF_SDH_BLE_LOG_ENABLED 0
 #define NRF_SDH_BLE_VS_UUID_COUNT 5			// Must observe the number of vendor specific services
 #define NRF_SDH_LOG_ENABLED 0

@@ -21,7 +21,13 @@
 #define BMP280_COMMAND_PRESSURE1 0x29           
 #define BMP280_COMMAND_PRESSURE2 0x2D    
 #define BMP280_COMMAND_PRESSURE3 0x31    
-#define BMP280_COMMAND_PRESSURE4 0x5D    
+#define BMP280_COMMAND_PRESSURE4 0x5D 
+
+#define BMP280_PARAM_HUM_OVS1    0x01
+#define BMP280_PARAM_HUM_OVS2    0x02
+#define BMP280_PARAM_HUM_OVS4    0x03
+#define BMP280_PARAM_HUM_OVS8    0x04
+
 
 #define BMP280_CHIPID            0x58
 
@@ -42,16 +48,26 @@ enum
     BMP280_REGISTER_DIG_P8              = 0x9C,
     BMP280_REGISTER_DIG_P9              = 0x9E,
 
+    BMP280_REGISTER_DIG_H1              = 0xA1,
+    BMP280_REGISTER_DIG_H2              = 0xE1,
+    BMP280_REGISTER_DIG_H3              = 0xE3,
+    BMP280_REGISTER_DIG_H4              = 0xE4,
+    BMP280_REGISTER_DIG_H5              = 0xE5,
+    BMP280_REGISTER_DIG_H6              = 0xE7,
+
     BMP280_REGISTER_CHIPID             = 0xD0,
     BMP280_REGISTER_VERSION            = 0xD1,
     BMP280_REGISTER_SOFTRESET          = 0xE0,
 
     BMP280_REGISTER_CAL26              = 0xE1,  // R calibration stored in 0xE1-0xF0
 
+    BMP280_REGISTER_CTRL_HUM           = 0xF2,
+    BMP280_REGISTER_STATUS             = 0XF3,
     BMP280_REGISTER_CONTROL            = 0xF4,
     BMP280_REGISTER_CONFIG             = 0xF5,
     BMP280_REGISTER_PRESSUREDATA       = 0xF7,
     BMP280_REGISTER_TEMPDATA           = 0xFA,
+    BMP280_REGISTER_HUMIDATA           = 0xFD,
 };
 
 /**@BMP280 Calibration data */
@@ -128,7 +144,7 @@ uint32_t bmp280_config(void);
  * @param[in]   partid_values   Pointer to variable to hold part id data
  * @retval      uint32_t        Error code
  */
-uint32_t bmp280_read_partid(bmp280_part_id_t * partid);
+uint32_t bmp280_read_partid(uint8_t * partid);
 
 /**@brief Function for reading BMP280 ambient data.
  *

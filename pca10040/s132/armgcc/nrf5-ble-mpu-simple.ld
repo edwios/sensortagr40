@@ -28,7 +28,7 @@ SECTIONS
    .log_dynamic_data :
   {
     PROVIDE(__start_log_dynamic_data = .);
-    KEEP(*(.log_dynamic_data))
+    KEEP(*(.log_dynamic_data*))
     PROVIDE(__stop_log_dynamic_data = .);
   } > RAM
   .cli_sorted_cmd_ptrs :
@@ -51,7 +51,7 @@ SECTIONS
   .log_const_data :
   {
     PROVIDE(__start_log_const_data = .);
-    KEEP(*(.log_const_data))
+    KEEP(*(.log_const_data*))
     PROVIDE(__stop_log_const_data = .);
   } > FLASH
   

@@ -55,9 +55,9 @@ SRC_FILES += \
   $(PROJ_DIR)/app_mpu.c \
   $(PROJ_DIR)/ble_mpu.c \
   $(PROJ_DIR)/nrf_drv_mpu_twi.c \
-  $(PROJ_DIR)/app_ap3216c.c \
-  $(PROJ_DIR)/ble_ap3216c.c \
-  $(PROJ_DIR)/nrf_drv_ap3216c_twi.c \
+  $(PROJ_DIR)/app_veml6075.c \
+  $(PROJ_DIR)/ble_veml6075.c \
+  $(PROJ_DIR)/nrf_drv_veml6075_twi.c \
   $(PROJ_DIR)/app_bmp280.c \
   $(PROJ_DIR)/ble_bmp280.c \
   $(PROJ_DIR)/nrf_drv_bmp280_twi.c \
@@ -217,7 +217,7 @@ OPT = -O3 -g3
 # C flags common to all targets
 CFLAGS += $(OPT)
 CFLAGS += -DBOARD_CUSTOM
-CFLAGS += -DCONFIG_GPIO_AS_PINRESET
+#CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 CFLAGS += -DNRF52
 CFLAGS += -DNRF52832_XXAA
 CFLAGS += -DNRF52_PAN_74
@@ -244,7 +244,7 @@ ASMFLAGS += -mcpu=cortex-m4
 ASMFLAGS += -mthumb -mabi=aapcs
 ASMFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 ASMFLAGS += -DBOARD_CUSTOM
-ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
+#ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
 ASMFLAGS += -DNRF52
 ASMFLAGS += -DNRF52832_XXAA
 ASMFLAGS += -DNRF52_PAN_74

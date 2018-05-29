@@ -113,7 +113,7 @@ uint32_t nrf_drv_ap3216c_read_registers(uint8_t reg, uint8_t * p_data, uint32_t 
     uint32_t err_code;
     uint32_t timeout = AP3216C_TWI_TIMEOUT;
 
-    err_code = nrf_drv_twi_tx(&m_twi_instance, AP3216C_ADDRESS, &reg, 1, false);
+    err_code = nrf_drv_twi_tx(&m_twi_instance, AP3216C_ADDRESS, &reg, 1, true);
     if(err_code != NRF_SUCCESS) return err_code;
 
     while((!twi_tx_done) && --timeout);
