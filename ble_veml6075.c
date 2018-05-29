@@ -176,6 +176,7 @@ static uint32_t ble_char_uvi_add(ble_veml6075_t * p_veml6075)
     return NRF_SUCCESS;
 }
 
+
 static uint32_t ble_char_visible_add(ble_veml6075_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
@@ -220,6 +221,7 @@ static uint32_t ble_char_visible_add(ble_veml6075_t * p_veml6075)
 
     return NRF_SUCCESS;
 }
+
 
 static uint32_t ble_char_ir_add(ble_veml6075_t * p_veml6075)
 {
@@ -310,7 +312,7 @@ static uint32_t ble_char_lux_add(ble_veml6075_t * p_veml6075)
 
     return NRF_SUCCESS;
 }
-
+/*
 static uint32_t ble_char_temp_add(ble_veml6075_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
@@ -355,6 +357,7 @@ static uint32_t ble_char_temp_add(ble_veml6075_t * p_veml6075)
 
     return NRF_SUCCESS;
 }
+*/
 
 /**@brief Function for initiating our new service.
  *
@@ -366,13 +369,14 @@ void ble_veml6075_service_init(ble_veml6075_t * p_veml6075)
     uint32_t   err_code; // Variable to hold return codes from library and softdevice functions
 
     ble_uuid_t        service_uuid;
-    ble_uuid128_t     base_uuid = {BLE_UUID_BASE_UUID};
-    service_uuid.uuid = BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE;
-    err_code = sd_ble_uuid_vs_add(&base_uuid, &service_uuid.type);
-    APP_ERROR_CHECK(err_code);    
+//    ble_uuid128_t     base_uuid = {BLE_UUID_BASE_UUID};
+//    service_uuid.uuid = BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE;
+//    err_code = sd_ble_uuid_vs_add(&base_uuid, &service_uuid.type);
+//    APP_ERROR_CHECK(err_code);    
 
     p_veml6075->conn_handle = BLE_CONN_HANDLE_INVALID;
 
+    BLE_UUID_BLE_ASSIGN(service_uuid, BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE);
     err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
                                         &service_uuid,
                                         &p_veml6075->service_handle);
@@ -385,7 +389,7 @@ void ble_veml6075_service_init(ble_veml6075_t * p_veml6075)
     ble_char_visible_add(p_veml6075);
     ble_char_ir_add(p_veml6075);
     ble_char_lux_add(p_veml6075);
-    ble_char_temp_add(p_veml6075);
+//    ble_char_temp_add(p_veml6075);
 }
 
 // ALREADY_DONE_FOR_YOU: Function to be called when updating characteristic value
@@ -454,6 +458,7 @@ void ble_veml6075_update(ble_veml6075_t *p_veml6075, veml6075_ambient_values_t *
     } 
 }
 
+/*
 void ble_veml6075_temperature_update(ble_veml6075_t *p_veml6075, temp_value_t * temperature_value)
 {
     // Send value if connected and notifying
@@ -473,5 +478,5 @@ void ble_veml6075_temperature_update(ble_veml6075_t *p_veml6075, temp_value_t * 
         sd_ble_gatts_hvx(p_veml6075->conn_handle, &hvx_params);
     }
 }
-
+*/
 

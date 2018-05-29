@@ -16,7 +16,7 @@
 
 #define BLE_UUID_AMBIENTLIGHT_SERVICE_UUID         0x181A // Environmental sensor
 #define BLE_UUID_IRRADIANCE_CHARACTERISTC_UUID     0x2A77 // Irradiance
-#define BLE_UUID_TEMPERATURE_CHARACTERISTC_UUID    0x2A6E // Temperature
+//#define BLE_UUID_TEMPERATURE_CHARACTERISTC_UUID    0x2A6E // Temperature
 #define BLE_UUID_UVA_CHARACTERISTC_UUID            0x815B // Just a random, but recognizable value
 #define BLE_UUID_UVB_CHARACTERISTC_UUID            0x815C // Just a random, but recognizable value
 #define BLE_UUID_VISIBLE_CHARACTERISTC_UUID        0x815D // Just a random, but recognizable value
@@ -34,7 +34,6 @@ typedef struct
     ble_gatts_char_handles_t    visible_char_handles;
     ble_gatts_char_handles_t    ir_char_handles;
     ble_gatts_char_handles_t    lux_char_handles;
-    ble_gatts_char_handles_t    temp_char_handles;
 }ble_veml6075_t;
 
 /**@brief Function for handling BLE Stack events related to VEML6075 service and characteristic.
