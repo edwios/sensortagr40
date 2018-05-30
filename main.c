@@ -51,6 +51,12 @@
  * with 'YOUR_JOB' indicates where and how you can customize.
  */
 
+#define USE_MPU                         0
+#define USE_BMP280                      1
+#define USE_AP3216C                     1
+#define USE_VEML6075                    0
+#define USE_LTR329                      0
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -74,7 +80,6 @@
 //#include "sensorsim.h"
 #include "ble_conn_state.h"
 #include "ble_nus.h"
-#include "ble_hts.h"
 #include "ble_dis.h"
 #include "nrf_ble_gatt.h"
 #include "bsp.h"
@@ -86,23 +91,36 @@
 
 #include "app_uart.h"
 #include "app_util_platform.h"
+#include "nrf_delay.h"
+
+#if (USE_MPU)
 #include "app_mpu.h"
-#include "app_veml6075.h"
-#include "app_bmp280.h"
 #include "ble_mpu.h"
+#endif
+#if (USE_VEML6075)
+#include "app_veml6075.h"
 #include "ble_veml6075.h"
+#endif
+#if (USE_BMP280)
+#include "app_bmp280.h"
 #include "ble_bmp280.h"
+#endif
+#if (USE_AP3216C)
+#include "app_ap3216c.h"
+#include "ble_ap3216c.h"
+#endif
+
 
 #define APP_FEATURE_NOT_SUPPORTED       BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2    /**< Reply when unsupported features are requested. */
 
-#define DEVICE_NAME                     "EnvMulti"                         /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "EnvMulti3216"                         /**< Name of device. Will be included in the advertising data. */
 #define MANUFACTURER_NAME               "ioStation Ltd."                        /**< Manufacturer. Will be passed to Device Information Service. */
-#define MODEL_NUM                       "HYP-AT1A02"                            /**< Model number. Will be passed to Device Information Service. */
+#define MODEL_NUM                       "HYP-AT1A03"                            /**< Model number. Will be passed to Device Information Service. */
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
-//#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
-#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+//#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
 
 #define APP_BLE_OBSERVER_PRIO           1                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
@@ -130,10 +148,9 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-#define USE_MPU                         0
+
 
 //BLE_NUS_DEF(m_nus);                                                             /**< BLE NUS service instance. */
-BLE_HTS_DEF(m_hts);                                                                 /**< Structure used to identify the health thermometer service. */
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 BLE_ADVERTISING_DEF(m_advertising);                                             /**< Advertising module instance. */
 APP_TIMER_DEF(m_timer_accel_update_id);
@@ -141,19 +158,29 @@ APP_TIMER_DEF(m_timer_accel_update_id);
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
 //static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;          /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
-static bool     m_hts_meas_ind_conf_pending = false;                            /**< Flag to keep track of when an indication confirmation is pending. */
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
 #define UART_RX_BUF_SIZE 32
 
+#if (USE_MPU)
 ble_mpu_t m_mpu;
+#endif
+#if (USE_VEML6075)
 ble_veml6075_t m_veml6075;
+veml6075_ambient_values_t m_ambient;
+#endif
+#if (USE_BMP280)
 ble_bmp280_t m_bmp280;
+bmp280_ambient_values_t m_bmpambient;
+#endif
+#if (USE_AP3216C)
+ble_ap3216c_t m_ap3216c;
+ap3216c_ambient_values_t m_ap3216cambient;
+#endif
+
 bool start_accel_update_flag = false;
 temp_value_t m_temp_value;
-veml6075_ambient_values_t m_ambient;
-bmp280_ambient_values_t m_bmpambient;
 
 /* YOUR_JOB: Declare all services structure your application is using
  *  BLE_XYZ_DEF(m_xyz);
@@ -174,8 +201,6 @@ void timer_accel_update_handler(void * p_context)
 }
 
 static void advertising_start(bool erase_bonds);
-static void temperature_measurement_send(void);
-static void on_hts_evt(ble_hts_t * p_hts, ble_hts_evt_t * p_evt);
 
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -477,7 +502,6 @@ static void services_init(void)
 
     ret_code_t  err_code;
     ble_nus_init_t nus_init;
-    ble_hts_init_t   hts_init;
     ble_dis_init_t   dis_init;
     ble_dis_sys_id_t sys_id;
 
@@ -489,27 +513,29 @@ static void services_init(void)
     err_code = ble_nus_init(&m_nus, &nus_init);
     APP_ERROR_CHECK(err_code);
 */
-    //ble_mpu_service_init(&m_mpu);
+    // Initialise various devices' services
+#if (USE_MPU)
+    ble_mpu_service_init(&m_mpu);
+#endif
+#if (USE_VEML6075)
     ble_veml6075_service_init(&m_veml6075);
+#endif
+#if (USE_AP3216C)
+    ble_ap3216c_service_init(&m_ap3216c);
+#endif
+#if (USE_BMP280)
     ble_bmp280_service_init(&m_bmp280);
+#endif
     
-    // Initialize Health Thermometer Service
-    memset(&hts_init, 0, sizeof(hts_init));
-
-    hts_init.evt_handler                 = on_hts_evt;
-    hts_init.temp_type_as_characteristic = TEMP_TYPE_AS_CHARACTERISTIC;
-    hts_init.temp_type                   = BLE_HTS_TEMP_TYPE_BODY;
-
     // Here the sec level for the Health Thermometer Service can be changed/increased.
+    /*
     BLE_GAP_CONN_SEC_MODE_SET_ENC_NO_MITM(&hts_init.hts_meas_attr_md.cccd_write_perm);
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&hts_init.hts_meas_attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&hts_init.hts_meas_attr_md.write_perm);
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&hts_init.hts_temp_type_attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&hts_init.hts_temp_type_attr_md.write_perm);
-
-//    err_code = ble_hts_init(&m_hts, &hts_init);
-//    APP_ERROR_CHECK(err_code);
+    */
 
     // Initialize Device Information Service.
     memset(&dis_init, 0, sizeof(dis_init));
@@ -526,71 +552,6 @@ static void services_init(void)
 
     err_code = ble_dis_init(&dis_init);
     APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for simulating and sending one Temperature Measurement.
- */
-static void temperature_measurement_send(void)
-{
-    ble_hts_meas_t temp_meas;
-    ret_code_t     err_code;
-
-    if (!m_hts_meas_ind_conf_pending)
-    {
-        temp_meas.temp_in_fahr_units       = false;
-        temp_meas.time_stamp_present       = false;
-        temp_meas.temp_in_celcius.exponent = -2;
-        temp_meas.temp_in_celcius.mantissa = (int32_t)m_temp_value;
-        temp_meas.temp_in_fahr.exponent    = -2;
-        temp_meas.temp_in_fahr.mantissa    = (32 * 100) + ((m_temp_value * 9) / 5);
-        temp_meas.temp_type                = BLE_HTS_TEMP_TYPE_BODY;
-        err_code = ble_hts_measurement_send(&m_hts, &temp_meas);
-
-        switch (err_code)
-        {
-            case NRF_SUCCESS:
-                // Measurement was successfully sent, wait for confirmation.
-                m_hts_meas_ind_conf_pending = true;
-                break;
-
-            case NRF_ERROR_INVALID_STATE:
-                // Ignore error.
-                break;
-
-            default:
-                APP_ERROR_HANDLER(err_code);
-                break;
-        }
-    }
-}
-
-
-/**@brief Function for handling the Health Thermometer Service events.
- *
- * @details This function will be called for all Health Thermometer Service events which are passed
- *          to the application.
- *
- * @param[in] p_hts  Health Thermometer Service structure.
- * @param[in] p_evt  Event received from the Health Thermometer Service.
- */
-static void on_hts_evt(ble_hts_t * p_hts, ble_hts_evt_t * p_evt)
-{
-    switch (p_evt->evt_type)
-    {
-        case BLE_HTS_EVT_INDICATION_ENABLED:
-            // Indication has been enabled, send a single temperature measurement
-            temperature_measurement_send();
-            break;
-
-        case BLE_HTS_EVT_INDICATION_CONFIRMED:
-            m_hts_meas_ind_conf_pending = false;
-            break;
-
-        default:
-            // No implementation needed.
-            break;
-    }
 }
 
 
@@ -687,9 +648,19 @@ static void sleep_mode_enter(void)
     err_code = bsp_btn_ble_sleep_mode_prepare();
     APP_ERROR_CHECK(err_code);
 
-    //mpu_sleep(true);
+#if (USE_MPU)
+    mpu_sleep(true);
+#endif
+#if (USE_VEML6075)
     veml6075_config_deactivate();
     veml6075_poweroff();
+#endif
+#if (USE_AP3216C)
+    ap3216c_config_deactivate();
+#endif
+#if (USE_BMP280)
+    bmp280_config_deactivate();
+#endif
     // Go to system-off mode (this function will not return; wakeup will cause a reset).
     err_code = sd_power_system_off();
     APP_ERROR_CHECK(err_code);
@@ -733,16 +704,25 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 
     //---NRF_LOG_INFO("Connection with link 0x%x/%d established.", p_gap_evt->conn_handle, periph_link_cnt);
 
-    //mpu_sleep(false);       // Wake up MPU
+    m_conn_handle = p_gap_evt->conn_handle;
+#if (USE_MPU)
+    mpu_sleep(false);       // Wake up MPU
+    m_mpu.conn_handle = p_gap_evt->conn_handle;
+#endif
+#if (USE_VEML6075)
     veml6075_config_activate();
+    m_veml6075.conn_handle = p_gap_evt->conn_handle;
+#endif
+#if (USE_AP3216C)
+    ap3216c_config_activate();
+    ap3216c_config();
+    m_ap3216c.conn_handle = p_gap_evt->conn_handle;
+#endif
+#if (USE_BMP280)
     bmp280_config_activate();
     bmp280_config();
-    ///err_code = bsp_indication_set(BSP_INDICATE_SENT_OK);
-    ///APP_ERROR_CHECK(err_code);
-    m_conn_handle = p_gap_evt->conn_handle;
-    m_mpu.conn_handle = p_gap_evt->conn_handle;
-    m_veml6075.conn_handle = p_gap_evt->conn_handle;
     m_bmp280.conn_handle = p_gap_evt->conn_handle;
+#endif
     start_accel_update_flag = true;
     application_timers_start();
     // Optional to re-start advertising if multiple connections (periph_link_cnt < Max allowed)
@@ -755,14 +735,24 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
     //uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
 
     start_accel_update_flag = false;
-    m_conn_handle = BLE_CONN_HANDLE_INVALID;
-    m_mpu.conn_handle = BLE_CONN_HANDLE_INVALID;
-    m_veml6075.conn_handle = BLE_CONN_HANDLE_INVALID;
-    m_bmp280.conn_handle = BLE_CONN_HANDLE_INVALID;
     application_timers_stop();
-    //mpu_sleep(true);    // Put MPU to sleep mode
+    m_conn_handle = BLE_CONN_HANDLE_INVALID;
+#if (USE_MPU)
+    m_mpu.conn_handle = BLE_CONN_HANDLE_INVALID;
+    mpu_sleep(true);    // Put MPU to sleep mode
+#endif
+#if (USE_VEML6075)
+    m_veml6075.conn_handle = BLE_CONN_HANDLE_INVALID;
     veml6075_config_deactivate();
+#endif
+#if (USE_AP3216C)
+    m_ap3216c.conn_handle = BLE_CONN_HANDLE_INVALID;
+    ap3216c_config_deactivate();
+#endif
+#if (USE_BMP280)
+    m_bmp280.conn_handle = BLE_CONN_HANDLE_INVALID;
     bmp280_config_deactivate();
+#endif
     err_code = bsp_indication_set(BSP_INDICATE_IDLE);
     APP_ERROR_CHECK(err_code);
     //---NRF_LOG_INFO("Connection 0x%x/%d has been disconnected. Reason: 0x%X",
@@ -1154,7 +1144,7 @@ static void uart_init(void)
 */
 /**@snippet [UART Initialization] */
 
-
+#if (USE_MPU)
 void mpu_setup(void)
 {
     ret_code_t ret_code;
@@ -1170,24 +1160,36 @@ void mpu_setup(void)
     ret_code = mpu_config(&p_mpu_config); // Configure the MPU with above values
     APP_ERROR_CHECK(ret_code); // Check for errors in return value 
 }
-
+#endif
 
 /**@brief Function for application main entry.
  */
 int main(void)
 {
-    bool erase_bonds, bmp280_read=false, veml6075_read=false;
-    uint8_t bmp280_partid=0, veml6057_partid=0;
+    bool erase_bonds;
+#if (USE_VEML6075)
+    uint8_t veml6057_partid=0;
+    bool veml6075_read=false;
+#endif
+#if (USE_BMP280)
+    bool bmp280_read=false;
+    uint8_t bmp280_partid=0;
+#endif
+#if (USE_AP3216C)
+    bool ap3216c_read=false;
+#endif
 
 //    NRF_POWER->DCDCEN = 1;  
 
     // Initialize.
+#if (USE_VEML6075)
     veml6075_poweroff();
+#endif
     LEDS_CONFIGURE(LEDS_MASK);
     LEDS_OFF(LEDS_MASK);
     log_init();
-    //NRF_LOG_INFO("\033[2J\033[;HSensorTag R40. Compiled @ %s.\r\n", nrf_log_push(__TIME__));
-    //---NRF_LOG_FLUSH();
+    NRF_LOG_INFO("\033[2J\033[;HSensorTag R40. Compiled @ %s.\r\n", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
 //    uart_init();  NRF_UART0->ENABLE = 1;
     timers_init();
     buttons_leds_init(&erase_bonds);
@@ -1200,25 +1202,38 @@ int main(void)
     conn_params_init();
     peer_manager_init();
 
-    // sd_power_dcdc_mode_set(1);   // Comment if without L1 and L2 on custom board
+    /** Comment the following if without L1 and L2 on custom board */
+    // sd_power_dcdc_mode_set(1);
+
+#if (USE_VEML6075)
     veml6075_poweron();
+    nrf_delay_us(300000);
     veml6075_init();
     veml6075_config();
+    veml6075_config_deactivate();
+#endif
+#if (USE_BMP280)
     bmp280_init();
     bmp280_config();
     bmp280_config_deactivate();
+#endif
+#if (USE_AP3216C)
+    ap3216c_init();
+    ap3216c_config();
+    ap3216c_config_deactivate();
+#endif
+#if (USE_MPU)
+    accel_values_t accel_values, last_accel_values;
+    gyro_values_t gyro_values;
+    unsigned long delta_accel=0;
+    mpu_sleep(true);
+    last_accel_values.x=last_accel_values.y=last_accel_values.z=0;
+#endif
 
-    advertising_start(erase_bonds);
-
-    //accel_values_t accel_values, last_accel_values;
-    //gyro_values_t gyro_values;
-    //unsigned long delta_accel=0;
-    //mpu_sleep(true);
-    veml6075_config_deactivate();
     //nrf_gpio_pin_set(LED_3);
 //    nrf_gpio_cfg_sense_input(BUTTON1, NRF_GPIO_PIN_PULLUP, NRF_GPIO_PIN_SENSE_LOW);
 
-    //last_accel_values.x=last_accel_values.y=last_accel_values.z=0;
+    advertising_start(erase_bonds);
     bsp_indication_set(BSP_INDICATE_IDLE);
 
     // Start execution.
@@ -1233,12 +1248,12 @@ int main(void)
             power_manage();
             if(start_accel_update_flag == true)
             {
-                /*
+#if (USE_MPU)
                 mpu_read_accel(&accel_values);
                 mpu_read_gyro(&gyro_values);
                 mpu_read_temp(&m_temp_value);
-                */
-
+#endif
+#if (USE_VEML6075)
                 if (veml6075_has_new_data()) {
                     veml6075_read_partid(&veml6057_partid);
                     veml6075_read_ambient(&m_ambient);
@@ -1247,6 +1262,16 @@ int main(void)
                     ble_veml6075_update(&m_veml6075, &m_ambient);
                     veml6075_read = true;
                 }
+#endif
+#if (USE_AP3216C)
+                if (ap3216c_has_new_data()) {
+                    ap3216c_read_ambient(&m_ap3216cambient);
+                    NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                    ble_ap3216c_update(&m_ap3216c, &m_ap3216cambient);
+                    ap3216c_read = true;
+                }
+#endif
+#if (USE_BMP280)
                 if (bmp280_has_new_data()) {
                     bmp280_read_partid(&bmp280_partid);
                     bmp280_read_ambient(&m_bmpambient);
@@ -1254,27 +1279,33 @@ int main(void)
                     ble_bmp280_update(&m_bmp280, &m_bmpambient);
                     bmp280_read = true;
                 }
-                //delta_accel = ((accel_values.x-last_accel_values.x)*(accel_values.x-last_accel_values.x))+((accel_values.y-last_accel_values.y)*(accel_values.y-last_accel_values.y))+((accel_values.z-last_accel_values.z)*(accel_values.z-last_accel_values.z));
-                //last_accel_values = accel_values;
-//                //---NRF_LOG_INFO("\033[2J\033[;HAccel: %05d, %05d, %05d\r\n", accel_values.x, accel_values.y, accel_values.z);
-                ////---NRF_LOG_INFO("Accel: %05d, %05d, %05d", accel_values.x, accel_values.y, accel_values.z);
-                ////---NRF_LOG_INFO("Delta: %d", delta_accel); 
-                ////---NRF_LOG_INFO("Gyro: %05d, %05d, %05d", gyro_values.x, gyro_values.y, gyro_values.z);
-                ////---NRF_LOG_INFO("Temperature: %05d\n", m_temp_value);
-//                //---NRF_LOG_INFO("Accel: %02x, %02x, %02x, %02x, %02x, %02x\r\n", (uint8_t)(accel_values.x >> 8), (uint8_t)accel_values.x, (uint8_t)(accel_values.y >> 8), (uint8_t)accel_values.y, (uint8_t)(accel_values.z >> 8), (uint8_t)accel_values.z);
-                ////---NRF_LOG_FLUSH();
-//                ble_mpu_update(&m_mpu, &accel_values);
+#endif
+#if (USE_MPU)
+                delta_accel = ((accel_values.x-last_accel_values.x)*(accel_values.x-last_accel_values.x))+((accel_values.y-last_accel_values.y)*(accel_values.y-last_accel_values.y))+((accel_values.z-last_accel_values.z)*(accel_values.z-last_accel_values.z));
+                last_accel_values = accel_values;
+                //---NRF_LOG_INFO("\033[2J\033[;HAccel: %05d, %05d, %05d\r\n", accel_values.x, accel_values.y, accel_values.z);
+                //---NRF_LOG_INFO("Accel: %05d, %05d, %05d", accel_values.x, accel_values.y, accel_values.z);
+                //---NRF_LOG_INFO("Delta: %d", delta_accel); 
+                //---NRF_LOG_INFO("Gyro: %05d, %05d, %05d", gyro_values.x, gyro_values.y, gyro_values.z);
+                //---NRF_LOG_INFO("Temperature: %05d\n", m_temp_value);
+                //---NRF_LOG_INFO("Accel: %02x, %02x, %02x, %02x, %02x, %02x\r\n", (uint8_t)(accel_values.x >> 8), (uint8_t)accel_values.x, (uint8_t)(accel_values.y >> 8), (uint8_t)accel_values.y, (uint8_t)(accel_values.z >> 8), (uint8_t)accel_values.z);
+                //---NRF_LOG_FLUSH();
+                ble_mpu_update(&m_mpu, &accel_values);
+#endif
+#if (USE_BMP280) && (USE_VEML6075)
                 if (veml6075_read && bmp280_read) {
                     veml6075_read = false;
                     bmp280_read = false;
                     start_accel_update_flag = false;
                 }
-                //bsp_indication_set(BSP_INDICATE_IDLE);
-                //nrf_gpio_pin_toggle(LED_1);
-                //if (delta_accel> 1000000)
-                //    nrf_gpio_pin_toggle(LED_3);
-                //---NRF_LOG_FLUSH();
-
+#endif
+#if (USE_BMP280) && (USE_AP3216C)
+                if (ap3216c_read && bmp280_read) {
+                    ap3216c_read = false;
+                    bmp280_read = false;
+                    start_accel_update_flag = false;
+                }
+#endif                
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
             }
         }

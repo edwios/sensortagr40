@@ -70,8 +70,8 @@ uint32_t nrf_drv_ap3216c_init(void)
        .scl                = AP3216C_TWI_SCL_PIN,
        .sda                = AP3216C_TWI_SDA_PIN,
        .frequency          = NRF_TWI_FREQ_100K,
-       .interrupt_priority = APP_IRQ_PRIORITY_HIGHEST,
-       .clear_bus_init      = true
+       .interrupt_priority = APP_IRQ_PRIORITY_HIGH,
+       .clear_bus_init      = false
     };
     
     NRF_LOG_DEBUG("TWI init begin ..."); NRF_LOG_FLUSH();
