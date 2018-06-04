@@ -28,7 +28,7 @@
 #define BMP280_PARAM_HUM_OVS4    0x03
 #define BMP280_PARAM_HUM_OVS8    0x04
 
-
+#define BME280_CHIPID            0x60
 #define BMP280_CHIPID            0x58
 
 /**@BMP280 Registers */

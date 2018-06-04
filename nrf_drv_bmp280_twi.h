@@ -7,6 +7,9 @@
 #ifndef NRF_DRV_BMP280__
 #define NRF_DRV_BMP280__
 
+// Define one of the followings in Makefile
+//  BASIC_SENSOR
+//  SENSORTAG_R40
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -16,8 +19,15 @@
  * for each board. This is only for my own convenience. 
  */
 #if defined(BOARD_CUSTOM)
+#if defined(SENSORTAG_R40)
+// For SensorTag R40
 #define BMP280_TWI_SCL_PIN 12
 #define BMP280_TWI_SDA_PIN 11
+#elif defined(BASIC_SENSOR)
+// For Basic Sensor board
+#define BMP280_TWI_SCL_PIN 3
+#define BMP280_TWI_SDA_PIN 5
+#endif
 #else
 #define BMP280_TWI_SCL_PIN 12
 #define BMP280_TWI_SDA_PIN 11

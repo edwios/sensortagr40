@@ -17,6 +17,13 @@ Perform at least once on a board with
 The above is required so that P.21 is no longer tied to /RESET
 
 ## Board variations
+
+### Basic Sensor
+Define by adding CFLAGS += -DBASIC_SENSOR in Makefile
+
+### SensorTag R40
+Define by adding FLAGS += -DSENSORTAG_R40 in Makefile
+
 ### Board with external VEML6075 UV sensor
 
 In main.c

@@ -52,10 +52,26 @@
  */
 
 #define USE_MPU                         0
+#if defined (BASIC_SENSOR) || defined(SENSORTAG_R40) 
 #define USE_BMP280                      1
-#define USE_AP3216C                     1
-#define USE_VEML6075                    0
+#else
+#define USE_BMP280                      0
+#endif
+#if defined (SENSORTAG_R40)
+#if defined(WITH_VEML6075)
+#define USE_VEML6075                    1
+#define USE_AP3216C                     0
 #define USE_LTR329                      0
+#else
+#define USE_VEML6075                    0
+#define USE_AP3216C                     1
+#define USE_LTR329                      0
+#endif
+#elif defined(SENSORTAG)
+#define USE_VEML6075                    0
+#define USE_AP3216C                     0
+#define USE_LTR329                      1
+#endif
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -112,15 +128,24 @@
 
 
 #define APP_FEATURE_NOT_SUPPORTED       BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2    /**< Reply when unsupported features are requested. */
-
-#define DEVICE_NAME                     "EnvMulti3216"                         /**< Name of device. Will be included in the advertising data. */
+#if defined(SENSORTAG_R40)
+#if (USE_VEML6075)
+#define DEVICE_NAME                     "EnvMultiUV"                         /**< Name of device. Will be included in the advertising data. */
+#else
+#define DEVICE_NAME                     "EnvMultiIR"                         /**< Name of device. Will be included in the advertising data. */
+#endif
+#elif defined(BASIC_SENSOR)
+#define DEVICE_NAME                     "EnvMultiTH"                         /**< Name of device. Will be included in the advertising data. */
+#else
+#define DEVICE_NAME                     "BLE_GeNErIC"
+#endif
 #define MANUFACTURER_NAME               "ioStation Ltd."                        /**< Manufacturer. Will be passed to Device Information Service. */
-#define MODEL_NUM                       "HYP-AT1A03"                            /**< Model number. Will be passed to Device Information Service. */
+#define MODEL_NUM                       "HYP-AT1A05"                            /**< Model number. Will be passed to Device Information Service. */
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
-#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
-//#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+//#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
 
 #define APP_BLE_OBSERVER_PRIO           1                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
@@ -165,6 +190,7 @@ static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        
 
 #if (USE_MPU)
 ble_mpu_t m_mpu;
+temp_value_t m_temp_value;
 #endif
 #if (USE_VEML6075)
 ble_veml6075_t m_veml6075;
@@ -180,7 +206,6 @@ ap3216c_ambient_values_t m_ap3216cambient;
 #endif
 
 bool start_accel_update_flag = false;
-temp_value_t m_temp_value;
 
 /* YOUR_JOB: Declare all services structure your application is using
  *  BLE_XYZ_DEF(m_xyz);
@@ -411,13 +436,21 @@ static void gap_params_init(void)
     ret_code_t              err_code;
     ble_gap_conn_params_t   gap_conn_params;
     ble_gap_conn_sec_mode_t sec_mode;
+    char *devName;
+    int no;
 
+    uint32_t l = strlen(DEVICE_NAME);
+
+    devName = malloc((l+5)*sizeof(char));
+    no = NRF_FICR->DEVICEADDR0%10000;
+    sprintf(devName, "%s%04d", DEVICE_NAME, no);
+    devName[l+5]='\0';
     //---NRF_LOG_DEBUG("Initialising GAP params"); //---NRF_LOG_FLUSH();
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
     err_code = sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *)DEVICE_NAME,
-                                          strlen(DEVICE_NAME));
+                                          (const uint8_t *)devName,
+                                          strlen(devName));
     APP_ERROR_CHECK(err_code);
 
     /* YOUR_JOB: Use an appearance value matching the application's use case.
@@ -1203,7 +1236,9 @@ int main(void)
     peer_manager_init();
 
     /** Comment the following if without L1 and L2 on custom board */
-    // sd_power_dcdc_mode_set(1);
+#if !defined(BASIC_SENSOR)
+    sd_power_dcdc_mode_set(1);
+#endif
 
 #if (USE_VEML6075)
     veml6075_poweron();
@@ -1258,7 +1293,7 @@ int main(void)
                     veml6075_read_partid(&veml6057_partid);
                     veml6075_read_ambient(&m_ambient);
                     NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
-                    NRF_LOG_INFO("[%d] UV: UVA %d, UVB %, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                    NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
                     ble_veml6075_update(&m_veml6075, &m_ambient);
                     veml6075_read = true;
                 }
@@ -1298,14 +1333,23 @@ int main(void)
                     bmp280_read = false;
                     start_accel_update_flag = false;
                 }
-#endif
-#if (USE_BMP280) && (USE_AP3216C)
+#elif (USE_BMP280) && (USE_AP3216C)               
                 if (ap3216c_read && bmp280_read) {
                     ap3216c_read = false;
                     bmp280_read = false;
                     start_accel_update_flag = false;
                 }
-#endif                
+#elif (USE_BMP280)
+                if (bmp280_read) {
+                    bmp280_read = false;
+                    start_accel_update_flag = false;
+                }
+#elif (USE_VEML6075)
+                if (veml6075_read) {
+                    veml6075_read = false;
+                    start_accel_update_flag = false;
+                }
+#endif
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
             }
         }

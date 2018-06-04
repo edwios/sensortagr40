@@ -50,10 +50,10 @@
 // Seems pretty hand wavey, though not nearly as annoying as the dark current
 // not being subtracted out by default.
 
-#define VEML6075_UVI_UVA_VIS_COEFF (3.33)
-#define VEML6075_UVI_UVA_IR_COEFF  (2.5)
-#define VEML6075_UVI_UVB_VIS_COEFF (3.66)
-#define VEML6075_UVI_UVB_IR_COEFF  (2.75)
+#define VEML6075_UVI_UVA_VIS_COEFF (1.08)
+#define VEML6075_UVI_UVA_IR_COEFF  (4.75)
+#define VEML6075_UVI_UVB_VIS_COEFF (1.47)
+#define VEML6075_UVI_UVB_IR_COEFF  (3.8)
 
 // Once the above offsets and crunching is done, there's a last weighting
 // function to convert the ADC counts into the UV index values. This handles

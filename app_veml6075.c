@@ -119,8 +119,8 @@ uint32_t veml6075_read_ambient(veml6075_ambient_values_t * veml6075_ambient_valu
     }
     dark = (uint16_t)((_dark[1] << 8) + _dark[0]);
 
-    //---NRF_LOG_DEBUG(">> UVA %d, UVB %d, C1 %d, C2 %d, DK %d", uva, uvb, uv_comp1, uv_comp2, dark);
-    //---NRF_LOG_FLUSH();
+    NRF_LOG_DEBUG(">> UVA %d, UVB %d, C1 %d, C2 %d, DK %d", uva, uvb, uv_comp1, uv_comp2, dark);
+    NRF_LOG_FLUSH();
 
     float uvacal = (uva - dark) - VEML6075_UVI_UVA_VIS_COEFF * (uv_comp1 - dark) 
                       - VEML6075_UVI_UVA_IR_COEFF * (uv_comp2 - dark);

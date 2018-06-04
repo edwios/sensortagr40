@@ -18,6 +18,10 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+// Use floating point
+//#define USE_FLOAT
+
+bmp280_part_id_t m_partid;
 
 uint32_t bmp280_config(void)
 {
@@ -105,22 +109,26 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     uint8_t *temperature_values;
     uint8_t *pressure_values;
     int32_t var1, var2, t_fine;
-    int64_t v1, v2, p;
-/** BME280 only
+    int64_t p;
+    bool    bme280 = false;
+/** BME280 only */
     uint8_t *humidity_values;
-    int32_t h;
-**/
 
+    bmp280_read_partid(&m_partid.chip_id);
+    if (m_partid.chip_id == BME280_CHIPID) bme280 = true;
+
+
+    // As recommended in datasheet, read all values in one go. Data started with Pressure
     err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_PRESSUREDATA, env_values, 8);
     if(err_code != NRF_SUCCESS) return err_code;
     pressure_values = (uint8_t *)env_values;
     temperature_values = (uint8_t *)(env_values+3*sizeof(uint8_t));
-//    humidity_values = (uint8_t *)(env_values+6*sizeof(uint8_t));
-
-//    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_TEMPDATA, temperature_values, 3);
-//    if(err_code != NRF_SUCCESS) return err_code;
-
+    if (bme280) {
+        humidity_values = (uint8_t *)(env_values+6*sizeof(uint8_t));
+    }
     int32_t adc_T = ((temperature_values[0] << 16) + (temperature_values[1] << 8) + (temperature_values[2] & 0xF0))/16;
+    int32_t adc_P = (((pressure_values[0] << 16) + (pressure_values[1] << 8) + (pressure_values[2] & 0xF0))/16)>>4;
+
     var1  = ((((adc_T>>3) - ((int32_t)_bmp280_calib.dig_T1 <<1))) *
         ((int32_t)_bmp280_calib.dig_T2)) >> 11;
     var2  = (((((adc_T>>4) - ((int32_t)_bmp280_calib.dig_T1)) *
@@ -129,18 +137,30 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     t_fine = var1 + var2;
     bmp280_ambient_values->ambient_temperature_value = (t_fine * 5 + 128) >> 8;
 
-//    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_PRESSUREDATA, pressure_values, 3);
-//    if(err_code != NRF_SUCCESS) return err_code;
-
-    int32_t adc_P = ((pressure_values[0] << 16) + (pressure_values[1] << 8) + (pressure_values[2] & 0xF0))/16;
-    adc_P >>= 4;
+#ifdef USE_FLOAT
+    double fvar1, fvar2, fp;
+    fvar1 = ((double)t_fine/2.0) - 64000.0;
+    fvar2 = fvar1 * fvar1 * ((double)_bmp280_calib.dig_P6) / 32768.0;
+    fvar2 = fvar2 + fvar1 * ((double)_bmp280_calib.dig_P5) * 2.0;
+    fvar2 = (fvar2/4.0)+(((double)_bmp280_calib.dig_P4) * 65536.0);
+    fvar1 = (((double)_bmp280_calib.dig_P3) * fvar1 * fvar1 / 524288.0 + ((double)_bmp280_calib.dig_P2) * fvar1) / 524288.0; fvar1 = (1.0 + fvar1 / 32768.0)*((double)_bmp280_calib.dig_P1);
+    if (fvar1 == 0.0) {
+        return 0; // avoid exception caused by division by zero
+    }
+    fp = 1048576.0 - (double)adc_P;
+    fp = (fp - (fvar2 / 4096.0)) * 6250.0 / fvar1;
+    fvar1 = ((double)_bmp280_calib.dig_P9) * fp * fp / 2147483648.0;
+    fvar2 = fp * ((double)_bmp280_calib.dig_P8) / 32768.0;
+    p = round(fp + (fvar1 + fvar2 + ((double)_bmp280_calib.dig_P7)) / 16.0); 
+#else
+    int64_t v1, v2;
     v1 = ((int64_t)t_fine) - 128000;
     v2 = v1 * v1 * (int64_t)_bmp280_calib.dig_P6;
     v2 = v2 + ((v1*(int64_t)_bmp280_calib.dig_P5)<<17);
     v2 = v2 + (((int64_t)_bmp280_calib.dig_P4)<<35);
     v1 = ((v1 * v1 * (int64_t)_bmp280_calib.dig_P3)>>8) +
         ((v1 * (int64_t)_bmp280_calib.dig_P2)<<12);
-        v1 = (((((int64_t)1)<<47)+v1))*((int64_t)_bmp280_calib.dig_P1)>>33;
+    v1 = (((((int64_t)1)<<47)+v1))*((int64_t)_bmp280_calib.dig_P1)>>33;
 
     if (v1 == 0) {
         return 0;  // avoid exception caused by division by zero
@@ -151,40 +171,72 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     v2 = (((int64_t)_bmp280_calib.dig_P8) * p) >> 19;
 
     p = ((p + v1 + v2) >> 8) + (((int64_t)_bmp280_calib.dig_P7)<<4);
-    bmp280_ambient_values->ambient_pressure_value = p/256;
+    p = (uint32_t)(p/256); // Has to /2, because of filter??
+    /*
+    v1 = (((int32_t)t_fine)>>1) - (int32_t)64000;
+    v2 = (((v1>>2) * (v1>>2)) >> 11 ) * ((int32_t)_bmp280_calib.dig_P6);
+    v2 = v2 + ((v1*((int32_t)_bmp280_calib.dig_P5))<<1);
+    v2 = (v2>>2)+(((int32_t)_bmp280_calib.dig_P4)<<16);
+    v1 = (((_bmp280_calib.dig_P3 * (((v1>>2) * (v1>>2)) >> 13 )) >> 3) + ((((int32_t)_bmp280_calib.dig_P2) * v1)>>1))>>18; v1 =((((32768+v1))*((int32_t)_bmp280_calib.dig_P1))>>15);
+    if (v1 == 0) {
+        return 0; // avoid exception caused by division by zero
+    }
+    p = (((uint32_t)(((int32_t)1048576)-adc_P)-(v2>>12)))*3125;
+    if (p < 0x80000000) {
+        p = (p << 1) / ((uint32_t)v1);
+    } else {
+        p = (p / (uint32_t)v1) * 2;
+    }
+    v1 = (((int32_t)_bmp280_calib.dig_P9) * ((int32_t)(((p>>3) * (p>>3))>>13)))>>12; v2 = (((int32_t)(p>>2)) * ((int32_t)_bmp280_calib.dig_P8))>>13;
+    p = (uint32_t)((int32_t)p + ((v1 + v2 + _bmp280_calib.dig_P7) >> 4));
+    */
+#endif
+
+    bmp280_ambient_values->ambient_pressure_value = p;
+    bmp280_ambient_values->ambient_humidity_value = 0;
 
     /** For BME280 only **/
-   
-//    int32_t adc_H = (humidity_values[0] << 8) + humidity_values[1];
+    if (bme280) {
+        int32_t adc_H = (humidity_values[0] << 8) + humidity_values[1];
 
-/** floating point math
-double var_H;
-   
-var_H = (((double)t_fine) - 76800.0);
-var_H = (adc_H - (((double)_bmp280_calib.dig_H4) * 64.0 + ((double)_bmp280_calib.dig_H5) / 16384.0 * var_H)) *
-(((double)_bmp280_calib.dig_H2) / 65536.0 * (1.0 + ((double)_bmp280_calib.dig_H6) / 67108864.0 * var_H *
-(1.0 + ((double)_bmp280_calib.dig_H3) / 67108864.0 * var_H)));
-var_H = var_H * (1.0 - ((double)_bmp280_calib.dig_H1) * var_H / 524288.0);
-   if (var_H > 100.0)
-       var_H = 100.0;
-   else if (var_H < 0.0)
-       var_H = 0.0;
+/** floating point math **/
+#ifdef USE_FLOAT
 
-h = (int16_t)round((var_H * 100));
-*/
-/** Integer math
-    h = (t_fine - ((int32_t)76800));
-    h = (((((adc_H << 14) - (((int32_t)_bmp280_calib.dig_H4) << 20) - (((int32_t)_bmp280_calib.dig_H5) * h)) +
-    ((int32_t)16384)) >> 15) * (((((((h * ((int32_t)_bmp280_calib.dig_H6)) >> 10) * (((h *
-    ((int32_t)_bmp280_calib.dig_H3)) >> 11) + ((int32_t)32768))) >> 10) + ((int32_t)2097152)) *
-    ((int32_t)_bmp280_calib.dig_H2) + 8192) >> 14));
-    h = (h - (((((h >> 15) * (h >> 15)) >> 7) *
-                              ((int32_t)_bmp280_calib.dig_H1)) >> 4));
-    h = (h < 0 ? 0 : h);
-    h = (h > 419430400 ? 419430400 : h);
-*/
+        double var_H;
+        uint32_t uh=0;
+          
+        var_H = (((double)t_fine) - 76800.0);
+        var_H = (adc_H - (((double)_bmp280_calib.dig_H4) * 64.0 + ((double)_bmp280_calib.dig_H5) / 16384.0 * var_H)) *
+        (((double)_bmp280_calib.dig_H2) / 65536.0 * (1.0 + ((double)_bmp280_calib.dig_H6) / 67108864.0 * var_H *
+        (1.0 + ((double)_bmp280_calib.dig_H3) / 67108864.0 * var_H)));
+        var_H = var_H * (1.0 - ((double)_bmp280_calib.dig_H1) * var_H / 524288.0);
+        if (var_H > 100.0)
+            var_H = 100.0;
+        else if (var_H < 0.0)
+            var_H = 0.0;
+        uh = round((var_H * 100));
+#else
 
-    bmp280_ambient_values->ambient_humidity_value = 0;
+/** Integer math **/
+
+        int32_t h=0;
+        uint64_t uh=0;
+
+        h = (t_fine - ((int32_t)76800));
+        h = (((((adc_H << 14) - (((int32_t)_bmp280_calib.dig_H4) << 20) - (((int32_t)_bmp280_calib.dig_H5) * h)) +
+        ((int32_t)16384)) >> 15) * (((((((h * ((int32_t)_bmp280_calib.dig_H6)) >> 10) * (((h *
+        ((int32_t)_bmp280_calib.dig_H3)) >> 11) + ((int32_t)32768))) >> 10) + ((int32_t)2097152)) *
+        ((int32_t)_bmp280_calib.dig_H2) + 8192) >> 14));
+        h = (h - (((((h >> 15) * (h >> 15)) >> 7) *
+                                  ((int32_t)_bmp280_calib.dig_H1)) >> 4));
+        h = (h < 0 ? 0 : h);
+        h = (h > 419430400 ? 419430400 : h);
+        uh = (uint32_t)(h >> 12);
+        uh = uh * 100 / 1024;
+#endif
+
+        bmp280_ambient_values->ambient_humidity_value = uh;
+    }
 
     return NRF_SUCCESS;
 }

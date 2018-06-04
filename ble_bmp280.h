@@ -12,7 +12,6 @@
 #include "ble_srv_common.h"
 #include "app_bmp280.h"
 #include "ble_common_items.h"
-#include "app_mpu.h"
 
 #define BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE      0x181A /**< Environmental Sensing service UUID. */
 #define BLE_UUID_ALTITUDE_CHARACTERISTC_UUID        0x2AB3 // Altitude
