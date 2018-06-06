@@ -52,10 +52,11 @@
  */
 
 #define USE_MPU                         0
-#if defined (BASIC_SENSOR) || defined(SENSORTAG_R40) 
+//#if defined (BASIC_SENSOR) || defined(SENSORTAG_R40) 
+#if defined (BASIC_SENSOR) 
 #define USE_BMP280                      1
 #else
-#define USE_BMP280                      0
+#define USE_BMP280                      0   // mixed sensors todo
 #endif
 #if defined (SENSORTAG_R40)
 #if defined(WITH_VEML6075)
@@ -152,7 +153,7 @@
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
 #define MIN_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(200, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (0.2 second). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(400, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (0.2 second). */
 #define SLAVE_LATENCY                   0                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
 
@@ -170,6 +171,8 @@
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
 #define TEMP_TYPE_AS_CHARACTERISTIC     1                                           /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
+
+#define BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE     0x181A /**< Environmental Sensing service UUID. */
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
@@ -550,6 +553,8 @@ static void services_init(void)
 #if (USE_MPU)
     ble_mpu_service_init(&m_mpu);
 #endif
+    // Initialise env sensing service
+
 #if (USE_VEML6075)
     ble_veml6075_service_init(&m_veml6075);
 #endif
@@ -604,6 +609,7 @@ static void on_conn_params_evt(ble_conn_params_evt_t * p_evt)
 
     if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED)
     {
+        NRF_LOG_DEBUG("Connection param failed"); NRF_LOG_FLUSH();
         err_code = sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_CONN_INTERVAL_UNACCEPTABLE);
         APP_ERROR_CHECK(err_code);
     }
@@ -732,10 +738,10 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 
 static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 {
-    ///ret_code_t  err_code;
-    //uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
+    //ret_code_t  err_code;
+    uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
 
-    //---NRF_LOG_INFO("Connection with link 0x%x/%d established.", p_gap_evt->conn_handle, periph_link_cnt);
+    NRF_LOG_INFO("Connection with link 0x%x/%d established.", p_gap_evt->conn_handle, periph_link_cnt);
 
     m_conn_handle = p_gap_evt->conn_handle;
 #if (USE_MPU)
@@ -765,7 +771,7 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 {
     ret_code_t  err_code;
-    //uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
+    uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
 
     start_accel_update_flag = false;
     application_timers_stop();
@@ -788,9 +794,9 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 #endif
     err_code = bsp_indication_set(BSP_INDICATE_IDLE);
     APP_ERROR_CHECK(err_code);
-    //---NRF_LOG_INFO("Connection 0x%x/%d has been disconnected. Reason: 0x%X",
-    //             p_gap_evt->conn_handle, periph_link_cnt,
-    //             p_gap_evt->params.disconnected.reason);
+    NRF_LOG_INFO("Connection 0x%x/%d has been disconnected. Reason: 0x%X",
+                 p_gap_evt->conn_handle, periph_link_cnt,
+                 p_gap_evt->params.disconnected.reason);
 
     // Optional to re-start advertising if multiple connections (periph_link_cnt < Max allowed)
     // advertising_start();
@@ -819,7 +825,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 #if defined(S132)
         case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
         {
-            //---NRF_LOG_DEBUG("PHY update request.");
+            NRF_LOG_DEBUG("PHY update request.");
             ble_gap_phys_t const phys =
             {
                 .rx_phys = BLE_GAP_PHY_AUTO,
@@ -832,7 +838,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GATTC_EVT_TIMEOUT:
             // Disconnect on GATT Client timeout event.
-            //---NRF_LOG_DEBUG("GATT Client Timeout.");
+            NRF_LOG_DEBUG("GATT Client Timeout.");
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -840,7 +846,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GATTS_EVT_TIMEOUT:
             // Disconnect on GATT Server timeout event.
-            //---NRF_LOG_DEBUG("GATT Server Timeout.");
+            NRF_LOG_DEBUG("GATT Server Timeout.");
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -1236,7 +1242,7 @@ int main(void)
     peer_manager_init();
 
     /** Comment the following if without L1 and L2 on custom board */
-#if !defined(BASIC_SENSOR)
+#if defined(BASIC_SENSOR)
     sd_power_dcdc_mode_set(1);
 #endif
 
@@ -1347,6 +1353,11 @@ int main(void)
 #elif (USE_VEML6075)
                 if (veml6075_read) {
                     veml6075_read = false;
+                    start_accel_update_flag = false;
+                }
+#elif (USE_AP3216C)
+                if (ap3216c_read) {
+                    ap3216c_read = false;
                     start_accel_update_flag = false;
                 }
 #endif

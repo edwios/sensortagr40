@@ -6,6 +6,7 @@ GROUP(-lgcc -lc -lnosys)
 MEMORY
 {
   FLASH (rx) : ORIGIN = 0x23000, LENGTH = 0x5d000
+/*  RAM (rwx) :  ORIGIN = 0x200020E0, LENGTH = 0xDF20 */
   RAM (rwx) :  ORIGIN = 0x20002130, LENGTH = 0xDED0
 }
 

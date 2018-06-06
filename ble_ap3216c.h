@@ -17,8 +17,8 @@
 #define BLE_UUID_AMBIENTLIGHT_SERVICE_UUID         0x181A // Environmental sensor
 #define BLE_UUID_IRRADIANCE_CHARACTERISTC_UUID     0x2A77 // Irradiance
 //#define BLE_UUID_TEMPERATURE_CHARACTERISTC_UUID    0x2A6E // Temperature
-#define BLE_UUID_VISIBLE_CHARACTERISTC_UUID        0x815B // Just a random, but recognizable value
-#define BLE_UUID_IR_CHARACTERISTC_UUID             0x815C // Just a random, but recognizable value
+#define BLE_UUID_VISIBLE_CHARACTERISTC_UUID        0x815D // Just a random, but recognizable value
+#define BLE_UUID_IR_CHARACTERISTC_UUID             0x815E // Just a random, but recognizable value
 #define BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE     0x181A /**< Environmental Sensing service UUID. */
 
 typedef struct
