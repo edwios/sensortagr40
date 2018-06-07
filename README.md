@@ -1,7 +1,8 @@
-# SensorTag R40
-Firmware for the new SensorTag R40 from Infor-link.
+# SensorTag R40 and Basic Sensor
+Firmware for the new SensorTag R40 and Basic Sensor from Infor-link.
+2018-06-08: Adopted to SDK15.0
 
-This board is based on nRF52832 and has 1 RGB LED, two buttons, 3 sensors (BMP280, BMI160, AP3216C) and on-board flash.
+Both boards are based on nRF52832 and has 1 RGB LED. The Basic Sensor has two buttons and one BME280 THP sensor. The SensorTag R40 has one button and 3 sensors (BMP280, BMI160, AP3216C) as well as on-board flash.
 
 The LOG is by default disable. Re-enable by setting `NRF_LOG_ENABLED` to 1 in `app_config.h`
 
