@@ -43,13 +43,13 @@ typedef struct
  * @param[in]   p_veml6075       veml6075 structure.
  * @param[in]   p_ble_evt  Event received from the BLE stack.
  */
-void ble_veml6075_on_ble_evt(ble_veml6075_t * p_veml6075, ble_evt_t * p_ble_evt);
+void ble_veml6075_on_ble_evt(ble_envsense_t * p_veml6075, ble_evt_t * p_ble_evt);
 
 /**@brief Function for initializing our new service.
  *
  * @param[in]   p_veml6075       Pointer to ble veml6075 structure.
  */
-void ble_veml6075_service_init(ble_veml6075_t * p_veml6075);
+void ble_veml6075_service_init(ble_envsense_t * p_veml6075);
 
 /**@brief Function for updating and sending new characteristic values
  *
@@ -58,7 +58,6 @@ void ble_veml6075_service_init(ble_veml6075_t * p_veml6075);
  * @param[in]   p_veml6075                 veml6075 structure.
  * @param[in]   characteristic_value     New characteristic value.
  */
-void ble_veml6075_update(ble_veml6075_t *p_veml6075, veml6075_ambient_values_t * veml6075_ambient_values);
-void ble_veml6075_temperature_update(ble_veml6075_t *p_veml6075, temp_value_t * temperature_value);
+void ble_veml6075_update(ble_envsense_t *p_veml6075, veml6075_ambient_values_t * veml6075_ambient_values);
 
 #endif  /* _ BLE_VEML6075_SERVICE_H__ */

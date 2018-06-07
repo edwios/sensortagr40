@@ -17,7 +17,7 @@
 #include "nrf_log_default_backends.h"
 
 
-void ble_ap3216c_on_ble_evt(ble_ap3216c_t * p_ap3216c, ble_evt_t * p_ble_evt)
+void ble_ap3216c_on_ble_evt(ble_envsense_t * p_ap3216c, ble_evt_t * p_ble_evt)
 {
     switch (p_ble_evt->header.evt_id)
     {
@@ -37,7 +37,7 @@ void ble_ap3216c_on_ble_evt(ble_ap3216c_t * p_ap3216c, ble_evt_t * p_ble_evt)
  * @param[in]   p_ap3216c        ap3216c structure.
  *
  */
-static uint32_t ble_char_visible_add(ble_ap3216c_t * p_ap3216c)
+static uint32_t ble_char_visible_add(ble_envsense_t * p_ap3216c)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -82,7 +82,7 @@ static uint32_t ble_char_visible_add(ble_ap3216c_t * p_ap3216c)
     return NRF_SUCCESS;
 }
 
-static uint32_t ble_char_ir_add(ble_ap3216c_t * p_ap3216c)
+static uint32_t ble_char_ir_add(ble_envsense_t * p_ap3216c)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -127,7 +127,7 @@ static uint32_t ble_char_ir_add(ble_ap3216c_t * p_ap3216c)
     return NRF_SUCCESS;
 }
 
-static uint32_t ble_char_lux_add(ble_ap3216c_t * p_ap3216c)
+static uint32_t ble_char_lux_add(ble_envsense_t * p_ap3216c)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -173,7 +173,7 @@ static uint32_t ble_char_lux_add(ble_ap3216c_t * p_ap3216c)
 }
 
 /*
-static uint32_t ble_char_temp_add(ble_ap3216c_t * p_ap3216c)
+static uint32_t ble_char_temp_add(ble_envsense_t * p_ap3216c)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -224,8 +224,9 @@ static uint32_t ble_char_temp_add(ble_ap3216c_t * p_ap3216c)
  * @param[in]   p_ap3216c        Our Service structure.
  *
  */
-void ble_ap3216c_service_init(ble_ap3216c_t * p_ap3216c)
+void ble_ap3216c_service_init(ble_envsense_t * p_ap3216c)
 {
+/*
     uint32_t   err_code; // Variable to hold return codes from library and softdevice functions
 
     ble_uuid_t        service_uuid;
@@ -242,14 +243,14 @@ void ble_ap3216c_service_init(ble_ap3216c_t * p_ap3216c)
                                         &p_ap3216c->service_handle);
     
     APP_ERROR_CHECK(err_code);
-    
+*/    
     ble_char_visible_add(p_ap3216c);
     ble_char_ir_add(p_ap3216c);
     ble_char_lux_add(p_ap3216c);
 }
 
 // ALREADY_DONE_FOR_YOU: Function to be called when updating characteristic value
-void ble_ap3216c_update(ble_ap3216c_t *p_ap3216c, ap3216c_ambient_values_t * ap3216c_ambient_values)
+void ble_ap3216c_update(ble_envsense_t *p_ap3216c, ap3216c_ambient_values_t * ap3216c_ambient_values)
 {
     // Send value if connected and notifying
     if (p_ap3216c->conn_handle != BLE_CONN_HANDLE_INVALID)
@@ -291,7 +292,7 @@ void ble_ap3216c_update(ble_ap3216c_t *p_ap3216c, ap3216c_ambient_values_t * ap3
 }
 
 /*
-void ble_ap3216c_temperature_update(ble_ap3216c_t *p_ap3216c, temp_value_t * temperature_value)
+void ble_envsense_temperature_update(ble_envsense_t *p_ap3216c, temp_value_t * temperature_value)
 {
     // Send value if connected and notifying
     if (p_ap3216c->conn_handle != BLE_CONN_HANDLE_INVALID)

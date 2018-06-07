@@ -36,13 +36,13 @@ typedef struct
  * @param[in]   p_bmp280       bmp280 structure.
  * @param[in]   p_ble_evt  Event received from the BLE stack.
  */
-void ble_bmp280_on_ble_evt(ble_bmp280_t * p_bmp280, ble_evt_t * p_ble_evt);
+void ble_bmp280_on_ble_evt(ble_envsense_t * p_bmp280, ble_evt_t * p_ble_evt);
 
 /**@brief Function for initializing our new service.
  *
  * @param[in]   p_bmp280       Pointer to ble bmp280 structure.
  */
-void ble_bmp280_service_init(ble_bmp280_t * p_bmp280);
+void ble_bmp280_service_init(ble_envsense_t * p_bmp280);
 
 /**@brief Function for updating and sending new characteristic values
  *
@@ -51,6 +51,6 @@ void ble_bmp280_service_init(ble_bmp280_t * p_bmp280);
  * @param[in]   p_bmp280                 bmp280 structure.
  * @param[in]   characteristic_value     New characteristic value.
  */
-void ble_bmp280_update(ble_bmp280_t *p_bmp280, bmp280_ambient_values_t * bmp280_ambient_values);
+void ble_bmp280_update(ble_envsense_t *p_bmp280, bmp280_ambient_values_t * bmp280_ambient_values);
 
 #endif  /* _ BLE_BMP280_SERVICE_H__ */

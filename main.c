@@ -52,8 +52,8 @@
  */
 
 #define USE_MPU                         0
-//#if defined (BASIC_SENSOR) || defined(SENSORTAG_R40) 
-#if defined (BASIC_SENSOR) 
+#if defined (BASIC_SENSOR) || defined(SENSORTAG_R40) 
+//#if defined (BASIC_SENSOR) 
 #define USE_BMP280                      1
 #else
 #define USE_BMP280                      0   // mixed sensors todo
@@ -109,6 +109,8 @@
 #include "app_uart.h"
 #include "app_util_platform.h"
 #include "nrf_delay.h"
+
+#include "ble_common_items.h"
 
 #if (USE_MPU)
 #include "app_mpu.h"
@@ -186,6 +188,7 @@ APP_TIMER_DEF(m_timer_accel_update_id);
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
 //static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;          /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
+static ble_envsense_t m_ble_envsense;
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
@@ -196,15 +199,12 @@ ble_mpu_t m_mpu;
 temp_value_t m_temp_value;
 #endif
 #if (USE_VEML6075)
-ble_veml6075_t m_veml6075;
 veml6075_ambient_values_t m_ambient;
 #endif
 #if (USE_BMP280)
-ble_bmp280_t m_bmp280;
 bmp280_ambient_values_t m_bmpambient;
 #endif
 #if (USE_AP3216C)
-ble_ap3216c_t m_ap3216c;
 ap3216c_ambient_values_t m_ap3216cambient;
 #endif
 
@@ -536,10 +536,20 @@ static void services_init(void)
        APP_ERROR_CHECK(err_code);
      */
 
-    ret_code_t  err_code;
-    ble_nus_init_t nus_init;
-    ble_dis_init_t   dis_init;
-    ble_dis_sys_id_t sys_id;
+    ret_code_t          err_code;
+    ble_nus_init_t      nus_init;
+    ble_dis_init_t      dis_init;
+    ble_dis_sys_id_t    sys_id;
+    ble_uuid_t          service_uuid;
+
+    BLE_UUID_BLE_ASSIGN(service_uuid, BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE);
+    m_ble_envsense.conn_handle = BLE_CONN_HANDLE_INVALID;
+
+    err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
+                                        &service_uuid,
+                                        &m_ble_envsense.service_handle);
+    
+    APP_ERROR_CHECK(err_code);
 
     //---NRF_LOG_DEBUG("Initialising Services"); //---NRF_LOG_FLUSH();
     memset(&nus_init, 0, sizeof(nus_init));
@@ -556,13 +566,13 @@ static void services_init(void)
     // Initialise env sensing service
 
 #if (USE_VEML6075)
-    ble_veml6075_service_init(&m_veml6075);
+    ble_veml6075_service_init(&m_ble_envsense);
 #endif
 #if (USE_AP3216C)
-    ble_ap3216c_service_init(&m_ap3216c);
+    ble_ap3216c_service_init(&m_ble_envsense);
 #endif
 #if (USE_BMP280)
-    ble_bmp280_service_init(&m_bmp280);
+    ble_bmp280_service_init(&m_ble_envsense);
 #endif
     
     // Here the sec level for the Health Thermometer Service can be changed/increased.
@@ -744,23 +754,21 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
     NRF_LOG_INFO("Connection with link 0x%x/%d established.", p_gap_evt->conn_handle, periph_link_cnt);
 
     m_conn_handle = p_gap_evt->conn_handle;
+    m_ble_envsense.conn_handle = p_gap_evt->conn_handle;    
 #if (USE_MPU)
     mpu_sleep(false);       // Wake up MPU
     m_mpu.conn_handle = p_gap_evt->conn_handle;
 #endif
 #if (USE_VEML6075)
     veml6075_config_activate();
-    m_veml6075.conn_handle = p_gap_evt->conn_handle;
 #endif
 #if (USE_AP3216C)
     ap3216c_config_activate();
     ap3216c_config();
-    m_ap3216c.conn_handle = p_gap_evt->conn_handle;
 #endif
 #if (USE_BMP280)
     bmp280_config_activate();
     bmp280_config();
-    m_bmp280.conn_handle = p_gap_evt->conn_handle;
 #endif
     start_accel_update_flag = true;
     application_timers_start();
@@ -776,20 +784,18 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
     start_accel_update_flag = false;
     application_timers_stop();
     m_conn_handle = BLE_CONN_HANDLE_INVALID;
+    m_ble_envsense.conn_handle = BLE_CONN_HANDLE_INVALID;
 #if (USE_MPU)
     m_mpu.conn_handle = BLE_CONN_HANDLE_INVALID;
     mpu_sleep(true);    // Put MPU to sleep mode
 #endif
 #if (USE_VEML6075)
-    m_veml6075.conn_handle = BLE_CONN_HANDLE_INVALID;
     veml6075_config_deactivate();
 #endif
 #if (USE_AP3216C)
-    m_ap3216c.conn_handle = BLE_CONN_HANDLE_INVALID;
     ap3216c_config_deactivate();
 #endif
 #if (USE_BMP280)
-    m_bmp280.conn_handle = BLE_CONN_HANDLE_INVALID;
     bmp280_config_deactivate();
 #endif
     err_code = bsp_indication_set(BSP_INDICATE_IDLE);
@@ -1300,7 +1306,7 @@ int main(void)
                     veml6075_read_ambient(&m_ambient);
                     NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
                     NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
-                    ble_veml6075_update(&m_veml6075, &m_ambient);
+                    ble_veml6075_update(&m_ble_envsense, &m_ambient);
                     veml6075_read = true;
                 }
 #endif
@@ -1308,7 +1314,7 @@ int main(void)
                 if (ap3216c_has_new_data()) {
                     ap3216c_read_ambient(&m_ap3216cambient);
                     NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
-                    ble_ap3216c_update(&m_ap3216c, &m_ap3216cambient);
+                    ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
                     ap3216c_read = true;
                 }
 #endif
@@ -1317,7 +1323,7 @@ int main(void)
                     bmp280_read_partid(&bmp280_partid);
                     bmp280_read_ambient(&m_bmpambient);
                     NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
-                    ble_bmp280_update(&m_bmp280, &m_bmpambient);
+                    ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
                     bmp280_read = true;
                 }
 #endif

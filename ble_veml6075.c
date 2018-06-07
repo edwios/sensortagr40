@@ -17,7 +17,7 @@
 #include "nrf_log_default_backends.h"
 
 
-void ble_veml6075_on_ble_evt(ble_veml6075_t * p_veml6075, ble_evt_t * p_ble_evt)
+void ble_veml6075_on_ble_evt(ble_envsense_t * p_veml6075, ble_evt_t * p_ble_evt)
 {
     switch (p_ble_evt->header.evt_id)
     {
@@ -37,7 +37,7 @@ void ble_veml6075_on_ble_evt(ble_veml6075_t * p_veml6075, ble_evt_t * p_ble_evt)
  * @param[in]   p_veml6075        veml6075 structure.
  *
  */
-static uint32_t ble_char_uva_add(ble_veml6075_t * p_veml6075)
+static uint32_t ble_char_uva_add(ble_envsense_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -87,7 +87,7 @@ static uint32_t ble_char_uva_add(ble_veml6075_t * p_veml6075)
  * @param[in]   p_veml6075        veml6075 structure.
  *
  */
-static uint32_t ble_char_uvb_add(ble_veml6075_t * p_veml6075)
+static uint32_t ble_char_uvb_add(ble_envsense_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -131,7 +131,7 @@ static uint32_t ble_char_uvb_add(ble_veml6075_t * p_veml6075)
 
     return NRF_SUCCESS;
 }
-static uint32_t ble_char_uvi_add(ble_veml6075_t * p_veml6075)
+static uint32_t ble_char_uvi_add(ble_envsense_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -177,7 +177,7 @@ static uint32_t ble_char_uvi_add(ble_veml6075_t * p_veml6075)
 }
 
 
-static uint32_t ble_char_visible_add(ble_veml6075_t * p_veml6075)
+static uint32_t ble_char_visible_add(ble_envsense_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -223,7 +223,7 @@ static uint32_t ble_char_visible_add(ble_veml6075_t * p_veml6075)
 }
 
 
-static uint32_t ble_char_ir_add(ble_veml6075_t * p_veml6075)
+static uint32_t ble_char_ir_add(ble_envsense_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -268,7 +268,7 @@ static uint32_t ble_char_ir_add(ble_veml6075_t * p_veml6075)
     return NRF_SUCCESS;
 }
 
-static uint32_t ble_char_lux_add(ble_veml6075_t * p_veml6075)
+static uint32_t ble_char_lux_add(ble_envsense_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -313,7 +313,7 @@ static uint32_t ble_char_lux_add(ble_veml6075_t * p_veml6075)
     return NRF_SUCCESS;
 }
 /*
-static uint32_t ble_char_temp_add(ble_veml6075_t * p_veml6075)
+static uint32_t ble_char_temp_add(ble_envsense_t * p_veml6075)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -364,8 +364,9 @@ static uint32_t ble_char_temp_add(ble_veml6075_t * p_veml6075)
  * @param[in]   p_veml6075        Our Service structure.
  *
  */
-void ble_veml6075_service_init(ble_veml6075_t * p_veml6075)
+void ble_veml6075_service_init(ble_envsense_t * p_veml6075)
 {
+/*
     uint32_t   err_code; // Variable to hold return codes from library and softdevice functions
 
     ble_uuid_t        service_uuid;
@@ -382,7 +383,7 @@ void ble_veml6075_service_init(ble_veml6075_t * p_veml6075)
                                         &p_veml6075->service_handle);
     
     APP_ERROR_CHECK(err_code);
-    
+*/    
     ble_char_uva_add(p_veml6075);
     ble_char_uvb_add(p_veml6075);
     ble_char_uvi_add(p_veml6075);
@@ -393,7 +394,7 @@ void ble_veml6075_service_init(ble_veml6075_t * p_veml6075)
 }
 
 // ALREADY_DONE_FOR_YOU: Function to be called when updating characteristic value
-void ble_veml6075_update(ble_veml6075_t *p_veml6075, veml6075_ambient_values_t * veml6075_ambient_values)
+void ble_veml6075_update(ble_envsense_t *p_veml6075, veml6075_ambient_values_t * veml6075_ambient_values)
 {
     // Send value if connected and notifying
     if (p_veml6075->conn_handle != BLE_CONN_HANDLE_INVALID)
@@ -458,25 +459,5 @@ void ble_veml6075_update(ble_veml6075_t *p_veml6075, veml6075_ambient_values_t *
     } 
 }
 
-/*
-void ble_veml6075_temperature_update(ble_veml6075_t *p_veml6075, temp_value_t * temperature_value)
-{
-    // Send value if connected and notifying
-    if (p_veml6075->conn_handle != BLE_CONN_HANDLE_INVALID)
-    {
-        uint16_t               len = sizeof(uint16_t);
-        ble_gatts_hvx_params_t hvx_params;
-        memset(&hvx_params, 0, sizeof(hvx_params));
 
-        memset(&hvx_params, 0, sizeof(hvx_params));
-        hvx_params.handle = p_veml6075->temp_char_handles.value_handle;
-        hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
-        hvx_params.offset = 0;
-        hvx_params.p_len  = &len;
-        hvx_params.p_data = (uint8_t*)temperature_value;  
-
-        sd_ble_gatts_hvx(p_veml6075->conn_handle, &hvx_params);
-    }
-}
-*/
 

@@ -29,7 +29,7 @@ typedef struct
     ble_gatts_char_handles_t    ir_char_handles;   /**< Handles related to the our new characteristic. */
     ble_gatts_char_handles_t    lux_char_handles;
     ble_gatts_char_handles_t    temp_char_handles;
-}ble_ltr329_t;
+}blble_ltr329_t;
 
 /**@brief Function for handling BLE Stack events related to LTR-329ALS service and characteristic.
  *
@@ -38,13 +38,13 @@ typedef struct
  * @param[in]   p_ltr329       ltr329 structure.
  * @param[in]   p_ble_evt  Event received from the BLE stack.
  */
-void ble_ltr329_on_ble_evt(ble_ltr329_t * p_ltr329, ble_evt_t * p_ble_evt);
+void ble_ltr329_on_ble_evt(ble_envsense_t * p_ltr329, ble_evt_t * p_ble_evt);
 
 /**@brief Function for initializing our new service.
  *
  * @param[in]   p_ltr329       Pointer to ble ltr329 structure.
  */
-void ble_ltr329_service_init(ble_ltr329_t * p_ltr329);
+void ble_ltr329_service_init(ble_envsense_t * p_ltr329);
 
 /**@brief Function for updating and sending new characteristic values
  *
@@ -53,7 +53,6 @@ void ble_ltr329_service_init(ble_ltr329_t * p_ltr329);
  * @param[in]   p_ltr329                 ltr329 structure.
  * @param[in]   characteristic_value     New characteristic value.
  */
-void ble_ltr329_update(ble_ltr329_t *p_ltr329, ltr329_ambient_values_t * ltr329_ambient_values);
-void ble_ltr329_temperature_update(ble_ltr329_t *p_ltr329, temp_value_t * temperature_value);
+void ble_ltr329_update(ble_envsense_t *p_ltr329, ltr329_ambient_values_t * ltr329_ambient_values);
 
 #endif  /* _ BLE_LTR329_SERVICE_H__ */

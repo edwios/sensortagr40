@@ -38,13 +38,13 @@ typedef struct
  * @param[in]   p_ap3216c       ap3216c structure.
  * @param[in]   p_ble_evt  Event received from the BLE stack.
  */
-void ble_ap3216c_on_ble_evt(ble_ap3216c_t * p_ap3216c, ble_evt_t * p_ble_evt);
+void ble_ap3216c_on_ble_evt(ble_envsense_t * p_ap3216c, ble_evt_t * p_ble_evt);
 
 /**@brief Function for initializing our new service.
  *
  * @param[in]   p_ap3216c       Pointer to ble ap3216c structure.
  */
-void ble_ap3216c_service_init(ble_ap3216c_t * p_ap3216c);
+void ble_ap3216c_service_init(ble_envsense_t * p_ap3216c);
 
 /**@brief Function for updating and sending new characteristic values
  *
@@ -53,7 +53,7 @@ void ble_ap3216c_service_init(ble_ap3216c_t * p_ap3216c);
  * @param[in]   p_ap3216c                 ap3216c structure.
  * @param[in]   characteristic_value     New characteristic value.
  */
-void ble_ap3216c_update(ble_ap3216c_t *p_ap3216c, ap3216c_ambient_values_t * ap3216c_ambient_values);
-//void ble_ap3216c_temperature_update(ble_ap3216c_t *p_ap3216c, temp_value_t * temperature_value);
+void ble_ap3216c_update(ble_envsense_t *p_ap3216c, ap3216c_ambient_values_t * ap3216c_ambient_values);
+//void ble_envsense_temperature_update(ble_envsense_t *p_ap3216c, temp_value_t * temperature_value);
 
 #endif  /* _ BLE_AP3216C_SERVICE_H__ */

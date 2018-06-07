@@ -17,7 +17,7 @@
 #include "nrf_log_default_backends.h"
 
 
-void ble_bmp280_on_ble_evt(ble_bmp280_t * p_bmp280, ble_evt_t * p_ble_evt)
+void ble_bmp280_on_ble_evt(ble_envsense_t * p_bmp280, ble_evt_t * p_ble_evt)
 {
     switch (p_ble_evt->header.evt_id)
     {
@@ -37,7 +37,7 @@ void ble_bmp280_on_ble_evt(ble_bmp280_t * p_bmp280, ble_evt_t * p_ble_evt)
  * @param[in]   p_bmp280        bmp280 structure.
  *
  */
-static uint32_t ble_char_temperature_add(ble_bmp280_t * p_bmp280)
+static uint32_t ble_char_temperature_add(ble_envsense_t * p_bmp280)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -82,7 +82,7 @@ static uint32_t ble_char_temperature_add(ble_bmp280_t * p_bmp280)
     return NRF_SUCCESS;
 }
 
-static uint32_t ble_char_humidity_add(ble_bmp280_t * p_bmp280)
+static uint32_t ble_char_humidity_add(ble_envsense_t * p_bmp280)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -127,7 +127,7 @@ static uint32_t ble_char_humidity_add(ble_bmp280_t * p_bmp280)
     return NRF_SUCCESS;
 }
 
-static uint32_t ble_char_pressure_add(ble_bmp280_t * p_bmp280)
+static uint32_t ble_char_pressure_add(ble_envsense_t * p_bmp280)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -173,7 +173,7 @@ static uint32_t ble_char_pressure_add(ble_bmp280_t * p_bmp280)
 }
 
 #if defined(REPORT_ALTITUDE)
-static uint32_t ble_char_altitide_add(ble_bmp280_t * p_bmp280)
+static uint32_t ble_char_altitide_add(ble_envsense_t * p_bmp280)
 {
     uint32_t   err_code = 0; // Variable to hold return codes from library and softdevice functions
     
@@ -224,25 +224,8 @@ static uint32_t ble_char_altitide_add(ble_bmp280_t * p_bmp280)
  * @param[in]   p_bmp280        Our Service structure.
  *
  */
-void ble_bmp280_service_init(ble_bmp280_t * p_bmp280)
-{
-    uint32_t   err_code; // Variable to hold return codes from library and softdevice functions
-
-    ble_uuid_t        service_uuid;
-//    ble_uuid128_t     base_uuid = {BLE_UUID_BASE_UUID};
-//    service_uuid.uuid = BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE;
-//    err_code = sd_ble_uuid_vs_add(&base_uuid, &service_uuid.type);
-//    APP_ERROR_CHECK(err_code);    
-
-    BLE_UUID_BLE_ASSIGN(service_uuid, BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE);
-    p_bmp280->conn_handle = BLE_CONN_HANDLE_INVALID;
-
-    err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
-                                        &service_uuid,
-                                        &p_bmp280->service_handle);
-    
-    APP_ERROR_CHECK(err_code);
-    
+void ble_bmp280_service_init(ble_envsense_t * p_bmp280)
+{    
     ble_char_temperature_add(p_bmp280);
     ble_char_humidity_add(p_bmp280);
     ble_char_pressure_add(p_bmp280);
@@ -252,7 +235,7 @@ void ble_bmp280_service_init(ble_bmp280_t * p_bmp280)
 }
 
 // ALREADY_DONE_FOR_YOU: Function to be called when updating characteristic value
-void ble_bmp280_update(ble_bmp280_t *p_bmp280, bmp280_ambient_values_t * bmp280_ambient_values)
+void ble_bmp280_update(ble_envsense_t *p_bmp280, bmp280_ambient_values_t * bmp280_ambient_values)
 {
     // Send value if connected and notifying
     if (p_bmp280->conn_handle != BLE_CONN_HANDLE_INVALID)
@@ -297,7 +280,7 @@ void ble_bmp280_update(ble_bmp280_t *p_bmp280, bmp280_ambient_values_t * bmp280_
 
 #if defined(REPORT_ALTITUDE)
         memset(&hvx_params, 0, sizeof(hvx_params));
-        hvx_params.handle = p_bmp280->temp_char_handles.value_handle;
+        hvx_params.handle = p_bmp280->altitude_char_handles.value_handle;
         hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
         hvx_params.offset = 0;
         hvx_params.p_len  = &len;
