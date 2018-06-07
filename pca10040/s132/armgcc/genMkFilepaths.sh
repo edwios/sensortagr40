@@ -26,11 +26,11 @@
 #		Same place as Makefile
 #
 
-SDK_ROOT="../../../../../.."
-APP_CONF=`pwd`/../config/app_config.h
+SDK_ROOT="../../../../../"
+APP_CONF=`pwd`/../config/sdk_config.h
 SRC_FILES=""
 INC_FOLDERS=""
-FILES=`awk '/^#define.*ENABLED/ {print tolower($2)}' $APP_CONF | sed -e 's/_enabled*/.c/g'`
+FILES=`awk '/^#define.*ENABLED.*1/ {print tolower($2)}' $APP_CONF | sed -e 's/_enabled*/.c/g'`
 for i in $FILES; do
 	j=$i
 	HAS_=`echo $i | egrep '_' - ; echo $?`

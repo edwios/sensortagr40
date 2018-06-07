@@ -96,17 +96,19 @@
 #include "bsp_btn_ble.h"
 //#include "sensorsim.h"
 #include "ble_conn_state.h"
-#include "ble_nus.h"
+//#include "ble_nus.h"
 #include "ble_dis.h"
 #include "nrf_ble_gatt.h"
 #include "bsp.h"
 #include "boards.h"
+#include "nrf_ble_qwr.h"
+#include "nrf_pwr_mgmt.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#include "app_uart.h"
+//#include "app_uart.h"
 #include "app_util_platform.h"
 #include "nrf_delay.h"
 
@@ -181,6 +183,7 @@
 
 
 //BLE_NUS_DEF(m_nus);                                                             /**< BLE NUS service instance. */
+NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 BLE_ADVERTISING_DEF(m_advertising);                                             /**< Advertising module instance. */
 APP_TIMER_DEF(m_timer_accel_update_id);
@@ -481,6 +484,18 @@ static void gatt_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
+/**@brief Function for handling Queued Write Module errors.
+ *
+ * @details A pointer to this function will be passed to each service which may need to inform the
+ *          application about an error.
+ *
+ * @param[in]   nrf_error   Error code containing information about what went wrong.
+ */
+static void nrf_qwr_error_handler(uint32_t nrf_error)
+{
+    APP_ERROR_HANDLER(nrf_error);
+}
+
 
 /**@brief Function for handling the YYY Service events.
  * YOUR_JOB implement a service handler function depending on the event the service you are using can generate
@@ -537,10 +552,18 @@ static void services_init(void)
      */
 
     ret_code_t          err_code;
-    ble_nus_init_t      nus_init;
+//    ble_nus_init_t      nus_init;
     ble_dis_init_t      dis_init;
     ble_dis_sys_id_t    sys_id;
     ble_uuid_t          service_uuid;
+    nrf_ble_qwr_init_t qwr_init = {0};
+
+    // Initialize Queued Write Module.
+    qwr_init.error_handler = nrf_qwr_error_handler;
+
+    err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
+    APP_ERROR_CHECK(err_code);
+
 
     BLE_UUID_BLE_ASSIGN(service_uuid, BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE);
     m_ble_envsense.conn_handle = BLE_CONN_HANDLE_INVALID;
@@ -552,7 +575,7 @@ static void services_init(void)
     APP_ERROR_CHECK(err_code);
 
     //---NRF_LOG_DEBUG("Initialising Services"); //---NRF_LOG_FLUSH();
-    memset(&nus_init, 0, sizeof(nus_init));
+    //memset(&nus_init, 0, sizeof(nus_init));
 
 /*
     nus_init.data_handler = nus_data_handler;
@@ -748,13 +771,16 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 
 static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 {
-    //ret_code_t  err_code;
-    uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
+    ret_code_t  err_code;
+    //uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
 
-    NRF_LOG_INFO("Connection with link 0x%x/%d established.", p_gap_evt->conn_handle, periph_link_cnt);
+    //NRF_LOG_INFO("Connection with link 0x%x/%d established.", p_gap_evt->conn_handle, periph_link_cnt);
 
     m_conn_handle = p_gap_evt->conn_handle;
-    m_ble_envsense.conn_handle = p_gap_evt->conn_handle;    
+    m_ble_envsense.conn_handle = p_gap_evt->conn_handle; 
+    err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
+    APP_ERROR_CHECK(err_code);
+   
 #if (USE_MPU)
     mpu_sleep(false);       // Wake up MPU
     m_mpu.conn_handle = p_gap_evt->conn_handle;
@@ -779,7 +805,7 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 {
     ret_code_t  err_code;
-    uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
+//    uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
 
     start_accel_update_flag = false;
     application_timers_stop();
@@ -800,9 +826,9 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 #endif
     err_code = bsp_indication_set(BSP_INDICATE_IDLE);
     APP_ERROR_CHECK(err_code);
-    NRF_LOG_INFO("Connection 0x%x/%d has been disconnected. Reason: 0x%X",
-                 p_gap_evt->conn_handle, periph_link_cnt,
-                 p_gap_evt->params.disconnected.reason);
+//    NRF_LOG_INFO("Connection 0x%x/%d has been disconnected. Reason: 0x%X",
+//                 p_gap_evt->conn_handle, periph_link_cnt,
+//                 p_gap_evt->params.disconnected.reason);
 
     // Optional to re-start advertising if multiple connections (periph_link_cnt < Max allowed)
     // advertising_start();
@@ -1053,7 +1079,7 @@ static void buttons_leds_init(bool * p_erase_bonds)
     bsp_event_t startup_event;
 
     //---NRF_LOG_DEBUG("Initialising bsp"); //---NRF_LOG_FLUSH();
-    err_code = bsp_init(BSP_INIT_LED | BSP_INIT_BUTTONS, bsp_event_handler);
+    err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
     APP_ERROR_CHECK(err_code);
 
     err_code = bsp_btn_ble_init(NULL, &startup_event);

@@ -12,7 +12,6 @@
 #include "ble_srv_common.h"
 #include "app_ap3216c.h"
 #include "ble_common_items.h"
-#include "app_mpu.h"
 
 #define BLE_UUID_AMBIENTLIGHT_SERVICE_UUID         0x181A // Environmental sensor
 #define BLE_UUID_IRRADIANCE_CHARACTERISTC_UUID     0x2A77 // Irradiance
