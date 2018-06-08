@@ -149,8 +149,8 @@
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
-//#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
-#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+//#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
 
 #define APP_BLE_OBSERVER_PRIO           1                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
@@ -175,7 +175,8 @@
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
 #define TEMP_TYPE_AS_CHARACTERISTIC     1                                           /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
-
+#define MAX_READS                       10                                       /**< Max number of sensor reads, then disconnect */
+#define READS_UNTIL_UPDATE              3                                       /**< Update to GATT until after 4 reads */
 #define BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE     0x181A /**< Environmental Sensing service UUID. */
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
@@ -192,6 +193,7 @@ APP_TIMER_DEF(m_timer_accel_update_id);
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
 //static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;          /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static ble_envsense_t m_ble_envsense;
+static uint8_t read_counts = 0;
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
@@ -916,6 +918,9 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
                     APP_ERROR_CHECK(err_code);
                 }
             }
+//            if (req.type == BLE_GATTS_AUTHORIZE_TYPE_READ) {
+                NRF_LOG_DEBUG("Reading uuid %x", req.request.read.uuid.uuid); NRF_LOG_FLUSH();
+//            }
         } break; // BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST
 
         default:
@@ -1237,6 +1242,8 @@ void mpu_setup(void)
  */
 int main(void)
 {
+    ret_code_t err_code;
+
     bool erase_bonds;
 #if (USE_VEML6075)
     uint8_t veml6057_partid=0;
@@ -1330,17 +1337,21 @@ int main(void)
                 if (veml6075_has_new_data()) {
                     veml6075_read_partid(&veml6057_partid);
                     veml6075_read_ambient(&m_ambient);
-                    NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
-                    NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
-                    ble_veml6075_update(&m_ble_envsense, &m_ambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
+                        NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                    }
+                    if (read_counts > READS_UNTIL_UPDATE) ble_veml6075_update(&m_ble_envsense, &m_ambient);
                     veml6075_read = true;
                 }
 #endif
 #if (USE_AP3216C)
                 if (ap3216c_has_new_data()) {
                     ap3216c_read_ambient(&m_ap3216cambient);
-                    NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
-                    ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                    }
+                    if (read_counts > READS_UNTIL_UPDATE) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
                     ap3216c_read = true;
                 }
 #endif
@@ -1348,8 +1359,10 @@ int main(void)
                 if (bmp280_has_new_data()) {
                     bmp280_read_partid(&bmp280_partid);
                     bmp280_read_ambient(&m_bmpambient);
-                    NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
-                    ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                    }
+                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
                     bmp280_read = true;
                 }
 #endif
@@ -1363,7 +1376,7 @@ int main(void)
                 //---NRF_LOG_INFO("Temperature: %05d\n", m_temp_value);
                 //---NRF_LOG_INFO("Accel: %02x, %02x, %02x, %02x, %02x, %02x\r\n", (uint8_t)(accel_values.x >> 8), (uint8_t)accel_values.x, (uint8_t)(accel_values.y >> 8), (uint8_t)accel_values.y, (uint8_t)(accel_values.z >> 8), (uint8_t)accel_values.z);
                 //---NRF_LOG_FLUSH();
-                ble_mpu_update(&m_mpu, &accel_values);
+                if (read_counts > READS_UNTIL_UPDATE) ble_mpu_update(&m_mpu, &accel_values);
 #endif
 #if (USE_BMP280) && (USE_VEML6075)
                 if (veml6075_read && bmp280_read) {
@@ -1394,6 +1407,17 @@ int main(void)
                 }
 #endif
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
+                if (!start_accel_update_flag) read_counts++;
+                if (read_counts > MAX_READS) {
+                    read_counts = 0;
+                    NRF_LOG_INFO("Enough sensor reads, disconnecting"); NRF_LOG_FLUSH();
+                    if (m_ble_envsense.conn_handle != BLE_CONN_HANDLE_INVALID) {
+
+                        err_code = sd_ble_gap_disconnect(m_ble_envsense.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+//err_code = NRF_SUCCESS;
+                        APP_ERROR_CHECK(err_code);
+                    }
+                }
             }
         }
     }

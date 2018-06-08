@@ -58,7 +58,8 @@ static uint32_t ble_char_visible_add(ble_envsense_t * p_ap3216c)
         
     ble_gatts_attr_md_t attr_md;
     memset(&attr_md, 0, sizeof(attr_md));
-    attr_md.vloc = BLE_GATTS_VLOC_STACK;    
+    attr_md.vloc = BLE_GATTS_VLOC_STACK;
+//    attr_md.rd_auth = 1;   
     
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.write_perm);
