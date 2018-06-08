@@ -1338,10 +1338,9 @@ int main(void)
                     veml6075_read_partid(&veml6057_partid);
                     veml6075_read_ambient(&m_ambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
-                        NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                        NRF_LOG_DEBUG("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
+                        NRF_LOG_DEBUG("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
                     }
-                    if (read_counts > READS_UNTIL_UPDATE) ble_veml6075_update(&m_ble_envsense, &m_ambient);
                     veml6075_read = true;
                 }
 #endif
@@ -1349,9 +1348,8 @@ int main(void)
                 if (ap3216c_has_new_data()) {
                     ap3216c_read_ambient(&m_ap3216cambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                        NRF_LOG_DEBUG("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
                     }
-                    if (read_counts > READS_UNTIL_UPDATE) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
                     ap3216c_read = true;
                 }
 #endif
@@ -1360,9 +1358,8 @@ int main(void)
                     bmp280_read_partid(&bmp280_partid);
                     bmp280_read_ambient(&m_bmpambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                        NRF_LOG_DEBUG("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
                     }
-                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
                     bmp280_read = true;
                 }
 #endif
@@ -1383,27 +1380,57 @@ int main(void)
                     veml6075_read = false;
                     bmp280_read = false;
                     start_accel_update_flag = false;
+                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                    if (read_counts > READS_UNTIL_UPDATE) ble_veml6075_update(&m_ble_envsense, &m_ambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                    }
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
+                        NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                    }
                 }
 #elif (USE_BMP280) && (USE_AP3216C)               
                 if (ap3216c_read && bmp280_read) {
                     ap3216c_read = false;
                     bmp280_read = false;
                     start_accel_update_flag = false;
+                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                    if (read_counts > READS_UNTIL_UPDATE) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                    }
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                    }
                 }
 #elif (USE_BMP280)
                 if (bmp280_read) {
                     bmp280_read = false;
                     start_accel_update_flag = false;
+                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                    }
                 }
 #elif (USE_VEML6075)
                 if (veml6075_read) {
                     veml6075_read = false;
                     start_accel_update_flag = false;
+                    if (read_counts > READS_UNTIL_UPDATE) ble_veml6075_update(&m_ble_envsense, &m_ambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
+                        NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                    }
                 }
 #elif (USE_AP3216C)
                 if (ap3216c_read) {
                     ap3216c_read = false;
                     start_accel_update_flag = false;
+                    if (read_counts > READS_UNTIL_UPDATE) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                    }
                 }
 #endif
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
