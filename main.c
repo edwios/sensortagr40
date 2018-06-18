@@ -150,7 +150,7 @@
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
 #define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
-//#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+//#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 0.1875 s). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
 
 #define APP_BLE_OBSERVER_PRIO           1                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
@@ -174,30 +174,32 @@
 #define SEC_PARAM_MIN_KEY_SIZE          7                                       /**< Minimum encryption key size. */
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
-#define TEMP_TYPE_AS_CHARACTERISTIC     1                                           /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
-#define MAX_READS                       10                                       /**< Max number of sensor reads, then disconnect */
-#define READS_UNTIL_UPDATE              3                                       /**< Update to GATT until after 4 reads */
-#define BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE     0x181A /**< Environmental Sensing service UUID. */
+#define TEMP_TYPE_AS_CHARACTERISTIC     1                                       /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
+#define MAX_READS                       100                                     /**< Max number of sensor reads, then disconnect */
+#define READS_UNTIL_UPDATE              5                                       /**< Update to GATT until after 4 reads */
+#define AUTO_DISCONNECT                                                         /**<Automatically disconnect after MAX_READS to save battery consumptions */
+
+#define FLASH_CS                        30                                      /**< Flash mem /CS pin */
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
+#define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(500)                   // 1000 ms intervals
 
+/*UART buffer size. */
+#define UART_TX_BUF_SIZE 32
+#define UART_RX_BUF_SIZE 32
 
 //BLE_NUS_DEF(m_nus);                                                             /**< BLE NUS service instance. */
 NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 BLE_ADVERTISING_DEF(m_advertising);                                             /**< Advertising module instance. */
 APP_TIMER_DEF(m_timer_accel_update_id);
-#define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(1000)                   // 1000 ms intervals
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
 //static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;          /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static ble_envsense_t m_ble_envsense;
 static uint8_t read_counts = 0;
 
-/*UART buffer size. */
-#define UART_TX_BUF_SIZE 32
-#define UART_RX_BUF_SIZE 32
 
 #if (USE_MPU)
 ble_mpu_t m_mpu;
@@ -1104,15 +1106,23 @@ static void log_init(void)
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
 
+/**@brief Function for initializing power management.
+ */
+static void power_management_init(void)
+{
+    ret_code_t err_code;
+    err_code = nrf_pwr_mgmt_init();
+    APP_ERROR_CHECK(err_code);
+}
 
 /**@brief Function for the Power manager.
- */
+ 
 static void power_manage(void)
 {
     ret_code_t err_code = sd_app_evt_wait();
     APP_ERROR_CHECK(err_code);
 }
-
+*/
 
 /**@brief Function for starting advertising.
  */
@@ -1242,7 +1252,6 @@ void mpu_setup(void)
  */
 int main(void)
 {
-    ret_code_t err_code;
 
     bool erase_bonds;
 #if (USE_VEML6075)
@@ -1265,12 +1274,17 @@ int main(void)
 #endif
     LEDS_CONFIGURE(LEDS_MASK);
     LEDS_OFF(LEDS_MASK);
+#if defined(SENSORTAG_R40)
+    nrf_gpio_cfg_output(FLASH_CS);
+    nrf_gpio_pin_set(FLASH_CS);
+#endif
     log_init();
     NRF_LOG_INFO("\033[2J\033[;HSensorTag R40. Compiled @ %s.\r\n", nrf_log_push(__TIME__));
     NRF_LOG_FLUSH();
 //    uart_init();  NRF_UART0->ENABLE = 1;
     timers_init();
     buttons_leds_init(&erase_bonds);
+    power_management_init();
     bsp_indication_set(BSP_INDICATE_CONNECTED);
     ble_stack_init();
     gap_params_init();
@@ -1280,9 +1294,9 @@ int main(void)
     conn_params_init();
     peer_manager_init();
 
-    /** Comment the following if without L1 and L2 on custom board */
+    /** Comment the following if without L4 and L5 on custom board */
 #if defined(BASIC_SENSOR)
-    sd_power_dcdc_mode_set(1);
+    sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
 #endif
 
 #if (USE_VEML6075)
@@ -1296,6 +1310,9 @@ int main(void)
     bmp280_init();
     bmp280_config();
     bmp280_config_deactivate();
+#if defined(BASIC_SENSOR)
+    bma255_config_deactivate();
+#endif
 #endif
 #if (USE_AP3216C)
     ap3216c_init();
@@ -1325,7 +1342,7 @@ int main(void)
     {
         if (NRF_LOG_PROCESS() == false)
         {
-            power_manage();
+            nrf_pwr_mgmt_run();
             if(start_accel_update_flag == true)
             {
 #if (USE_MPU)
@@ -1434,6 +1451,8 @@ int main(void)
                 }
 #endif
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
+#ifdef AUTO_DISCONNECT
+                ret_code_t err_code;
                 if (!start_accel_update_flag) read_counts++;
                 if (read_counts > MAX_READS) {
                     read_counts = 0;
@@ -1441,10 +1460,12 @@ int main(void)
                     if (m_ble_envsense.conn_handle != BLE_CONN_HANDLE_INVALID) {
 
                         err_code = sd_ble_gap_disconnect(m_ble_envsense.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-//err_code = NRF_SUCCESS;
                         APP_ERROR_CHECK(err_code);
                     }
                 }
+#else
+                read_counts = READS_UNTIL_UPDATE+1;
+#endif
             }
         }
     }

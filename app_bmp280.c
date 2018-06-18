@@ -19,7 +19,7 @@
 #include "nrf_log_default_backends.h"
 
 // Use floating point
-//#define USE_FLOAT
+#define USE_FLOAT
 
 bmp280_part_id_t m_partid;
 
@@ -29,7 +29,7 @@ uint32_t bmp280_config(void)
     int16_t h4, h5;
     uint8_t ch=0;
 
-    //---//---NRF_LOGDEBUG("Configurating BMP280"); //---NRF_LOGFLUSH();
+    //---//---NRF_LOG_DEBUG("Configurating BMP280"); //---NRF_LOG_FLUSH();
     err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_CTRL_HUM, &ch, 1);
     ch &= 0xF8;
     ch |= BMP280_PARAM_HUM_OVS1;
@@ -41,7 +41,7 @@ uint32_t bmp280_config(void)
     err_code = nrf_drv_bmp280_read_register16(BMP280_REGISTER_DIG_T1, &_bmp280_calib.dig_T1);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_T2, &_bmp280_calib.dig_T2);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_T3, &_bmp280_calib.dig_T3);
-//    //---NRF_LOGDEBUG("dig T1,2,3 %d, %d, %d", _bmp280_calib.dig_T1, _bmp280_calib.dig_T2, _bmp280_calib.dig_T3); //---NRF_LOGFLUSH();
+//    //---NRF_LOG_DEBUG("dig T1,2,3 %d, %d, %d", _bmp280_calib.dig_T1, _bmp280_calib.dig_T2, _bmp280_calib.dig_T3); //---NRF_LOG_FLUSH();
 
     err_code = nrf_drv_bmp280_read_register16(BMP280_REGISTER_DIG_P1, &_bmp280_calib.dig_P1);
     err_code = nrf_drv_bmp280_read_register16S(BMP280_REGISTER_DIG_P2, &_bmp280_calib.dig_P2);
@@ -65,7 +65,33 @@ uint32_t bmp280_config(void)
     return NRF_SUCCESS;
 }
 
+#if defined(BASIC_SENSOR)
+uint32_t bma255_read_partid(uint8_t * partid)
+{
+    // Read PartID of the BMA255 (0xFA) from BGW_CHIPID (reg 0x00)
+    uint32_t err_code;
+    uint8_t raw_value=0;
+    err_code = nrf_drv_bmp280_read_registers(BMA255_REGISTER_CHIPID, &raw_value, 1);
+    if(err_code != NRF_SUCCESS) return err_code;
+    *partid = raw_value;
+    if (raw_value != BMA255_CHIPID) {
+        NRF_LOG_INFO("BMA255 not found!"); NRF_LOG_FLUSH();        
+    }
+    return NRF_SUCCESS;
+}
 
+
+uint32_t bma255_config_deactivate(void)
+{
+    uint32_t err_code;
+    
+    // Configure BMA255 to suspend mode (1uA) as Normal mode will consume 100uA
+    NRF_LOG_DEBUG("Suspending BMA255"); NRF_LOG_FLUSH();
+    err_code = nrf_drv_bma255_write_single_register(BMA255_PMU_LPW, 0x9E);
+    if(err_code != NRF_SUCCESS) return err_code;
+    return NRF_SUCCESS;
+}
+#endif
 
 uint32_t bmp280_init(void)
 {
@@ -73,14 +99,14 @@ uint32_t bmp280_init(void)
     uint8_t chipid;
 	
 	// Initate TWI or SPI driver dependent on what is defined from the project
-    //---NRF_LOGDEBUG("Initialising BMP280"); //---NRF_LOGFLUSH();
+    //---NRF_LOG_DEBUG("Initialising BMP280"); //---NRF_LOG_FLUSH();
 	err_code = nrf_drv_bmp280_init();
     if(err_code != NRF_SUCCESS) return err_code;
 
     err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_CHIPID, &chipid, 1);
     if(err_code != NRF_SUCCESS) return err_code;
     if (chipid != BMP280_CHIPID) {
-        //---NRF_LOGDEBUG("Init error: BMP280 not found!"); //---NRF_LOGFLUSH();
+        //---NRF_LOG_DEBUG("Init error: BMP280 not found!"); //---NRF_LOG_FLUSH();
     }
     return NRF_SUCCESS;
 }
@@ -126,8 +152,8 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     if (bme280) {
         humidity_values = (uint8_t *)(env_values+6*sizeof(uint8_t));
     }
-    int32_t adc_T = ((temperature_values[0] << 16) + (temperature_values[1] << 8) + (temperature_values[2] & 0xF0))/16;
-    int32_t adc_P = (((pressure_values[0] << 16) + (pressure_values[1] << 8) + (pressure_values[2] & 0xF0))/16)>>4;
+    int32_t adc_T = (((uint32_t)(temperature_values[0]) << 12) | ((uint32_t)(temperature_values[1]) << 4) | ((uint32_t)(temperature_values[2]) >> 4));
+    int32_t adc_P = (((uint32_t)(pressure_values[0]) << 12) | (((uint32_t)pressure_values[1]) << 4) | ((uint32_t)(pressure_values[2]) >> 4));
 
     var1  = ((((adc_T>>3) - ((int32_t)_bmp280_calib.dig_T1 <<1))) *
         ((int32_t)_bmp280_calib.dig_T2)) >> 11;
@@ -143,7 +169,8 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     fvar2 = fvar1 * fvar1 * ((double)_bmp280_calib.dig_P6) / 32768.0;
     fvar2 = fvar2 + fvar1 * ((double)_bmp280_calib.dig_P5) * 2.0;
     fvar2 = (fvar2/4.0)+(((double)_bmp280_calib.dig_P4) * 65536.0);
-    fvar1 = (((double)_bmp280_calib.dig_P3) * fvar1 * fvar1 / 524288.0 + ((double)_bmp280_calib.dig_P2) * fvar1) / 524288.0; fvar1 = (1.0 + fvar1 / 32768.0)*((double)_bmp280_calib.dig_P1);
+    fvar1 = (((double)_bmp280_calib.dig_P3) * fvar1 * fvar1 / 524288.0 + ((double)_bmp280_calib.dig_P2) * fvar1) / 524288.0;
+    fvar1 = (1.0 + fvar1 / 32768.0)*((double)_bmp280_calib.dig_P1);
     if (fvar1 == 0.0) {
         return 0; // avoid exception caused by division by zero
     }

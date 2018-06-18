@@ -39,7 +39,7 @@ uint32_t veml6075_config(void)
     uint32_t err_code;
 
     //---NRF_LOG_DEBUG("Configurating VEML6075ALS"); //---NRF_LOG_FLUSH();
-    veml6075_conf_reg |= VEML6075_CONF_IT_100MS;
+    veml6075_conf_reg |= VEML6075_CONF_IT_400MS;
     err_code = nrf_drv_veml6075_write_single_register(VEML6075_REG_CONF, veml6075_conf_reg);
     if(err_code != NRF_SUCCESS) {
         //---NRF_LOG_DEBUG("ERROR Configurating VEML6075"); //---NRF_LOG_FLUSH();

@@ -31,6 +31,10 @@
 #define BME280_CHIPID            0x60
 #define BMP280_CHIPID            0x58
 
+#define BMA255_PMU_LPW           0x11
+#define BMA255_REGISTER_CHIPID   0x00
+#define BMA255_CHIPID            0xFA
+
 /**@BMP280 Registers */
 enum
 {
@@ -138,6 +142,11 @@ uint32_t bmp280_init(void);
  * @retval      uint32_t        Error code
  */
 uint32_t bmp280_config(void);
+
+#if defined(BASIC_SENSOR)
+uint32_t bma255_read_partid(uint8_t * partid);
+uint32_t bma255_config_deactivate(void);
+#endif
 
 /**@brief Function for reading BMP280 part id data.
  *

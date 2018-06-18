@@ -38,6 +38,7 @@
 #define BMP280_TWI_TIMEOUT 			10000 
 #define BMP280_ADDRESS     			0x76
 
+#define BMA255_ADDRESS				0x18
 
 /**@brief Function to initiate TWI drivers
  *
@@ -46,7 +47,6 @@
 uint32_t nrf_drv_bmp280_init(void);
 	
 
-
 /**@brief Function for reading an arbitrary register
  *
  * @param[in]   reg             Register to write
@@ -54,6 +54,10 @@ uint32_t nrf_drv_bmp280_init(void);
  * @retval      uint32_t        Error code
  */
 uint32_t nrf_drv_bmp280_write_single_register(uint8_t reg, uint8_t data);
+
+#if defined(BASIC_SENSOR)
+uint32_t nrf_drv_bma255_write_single_register(uint8_t reg, uint8_t data);
+#endif
 
 
 

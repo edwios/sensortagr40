@@ -85,8 +85,25 @@ uint32_t nrf_drv_bmp280_init(void)
 	return NRF_SUCCESS;
 }
 
+#if defined(BASIC_SENSOR)
+uint32_t nrf_drv_bma255_write_single_register(uint8_t reg, uint8_t data)
+{
+    uint32_t err_code;
+    uint32_t timeout = BMP280_TWI_TIMEOUT;
 
+    uint8_t packet[2] = {reg, data};
 
+    err_code = nrf_drv_twi_tx(&m_twi_instance, BMA255_ADDRESS, packet, 2, false);
+    if(err_code != NRF_SUCCESS) return err_code;
+
+    while((!twi_tx_done) && --timeout);
+    if(!timeout) return NRF_ERROR_TIMEOUT;
+
+    twi_tx_done = false;
+
+    return err_code;
+}
+#endif
 
 uint32_t nrf_drv_bmp280_write_single_register(uint8_t reg, uint8_t data)
 {

@@ -17,6 +17,14 @@ Perform at least once on a board with
     nrfjprog --recover
 The above is required so that P.21 is no longer tied to /RESET
 
+##Logging
+make sdk_config to launch the GUI for maintaining sdk_config.h
+Enable NRF_LOG and compile, flash.
+Launch JLink logger:
+JLinkExe -device NRF52832_XXAA -if SWD -speed 4000 -autoconnect 1
+JLinkRTTClient
+
+
 ##Note
 _NRF_SDH_BLE_VS_UUID_COUNT_ is very important. It *MUST* match the VS UUID count. If not, some Bluetooth client may not be able to read reliably the Services. If there is no VS UUID, set it to 0.
 
