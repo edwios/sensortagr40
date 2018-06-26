@@ -74,6 +74,8 @@
 #define USE_LTR329                      1
 #endif
 
+#define AUTO_DISCONNECT
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -717,6 +719,8 @@ static void sleep_mode_enter(void)
 {
     ret_code_t err_code;
 
+    read_counts = 0;    // reset read count
+
     ///err_code = bsp_indication_set(BSP_INDICATE_IDLE);
     ///APP_ERROR_CHECK(err_code);
 
@@ -812,6 +816,7 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 //    uint32_t    periph_link_cnt = ble_conn_state_n_peripherals(); // Number of peripheral links.
 
     start_accel_update_flag = false;
+    read_counts = 0;
     application_timers_stop();
     m_conn_handle = BLE_CONN_HANDLE_INVALID;
     m_ble_envsense.conn_handle = BLE_CONN_HANDLE_INVALID;
@@ -1465,6 +1470,16 @@ int main(void)
                 }
 #else
                 read_counts = READS_UNTIL_UPDATE+1;
+#endif
+            } else {
+#if (USE_AP3216C)
+                ap3216c_read = false;
+#endif
+#if (USE_VEML6075)
+                veml6075_read = false;
+#endif
+#if (USE_BMP280)
+                bmp280_read = false;
 #endif
             }
         }
