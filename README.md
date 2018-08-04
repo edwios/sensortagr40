@@ -34,7 +34,13 @@ _NRF_SDH_BLE_VS_UUID_COUNT_ is very important. It *MUST* match the VS UUID count
 Define by adding CFLAGS += -DBASIC_SENSOR in Makefile
 
 ### SensorTag R40
-Define by adding FLAGS += -DSENSORTAG_R40 in Makefile
+Define by adding CFLAGS += -DSENSORTAG_R40 in Makefile
+
+### AC Powered
+Define by adding CFLASG += -DPOWERUP in Makefile
+
+
+##Other board variations
 
 ### Board with external VEML6075 UV sensor
 

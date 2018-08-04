@@ -74,7 +74,7 @@
 #define USE_LTR329                      1
 #endif
 
-#define AUTO_DISCONNECT
+//#undef AUTO_DISCONNECT
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -179,7 +179,10 @@
 #define TEMP_TYPE_AS_CHARACTERISTIC     1                                       /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
 #define MAX_READS                       100                                     /**< Max number of sensor reads, then disconnect */
 #define READS_UNTIL_UPDATE              5                                       /**< Update to GATT until after 4 reads */
+
+#ifdef POWERUP
 #define AUTO_DISCONNECT                                                         /**<Automatically disconnect after MAX_READS to save battery consumptions */
+#endif
 
 #define FLASH_CS                        30                                      /**< Flash mem /CS pin */
 
@@ -788,7 +791,9 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
     m_ble_envsense.conn_handle = p_gap_evt->conn_handle; 
     err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
     APP_ERROR_CHECK(err_code);
-   
+#ifdef POWERUP
+    bsp_board_led_on(BSP_BOARD_LED_1);
+#endif
 #if (USE_MPU)
     mpu_sleep(false);       // Wake up MPU
     m_mpu.conn_handle = p_gap_evt->conn_handle;
@@ -835,6 +840,10 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 #endif
     err_code = bsp_indication_set(BSP_INDICATE_IDLE);
     APP_ERROR_CHECK(err_code);
+#ifdef POWERUP
+    bsp_board_led_off(BSP_BOARD_LED_1);
+#endif
+
 //    NRF_LOG_INFO("Connection 0x%x/%d has been disconnected. Reason: 0x%X",
 //                 p_gap_evt->conn_handle, periph_link_cnt,
 //                 p_gap_evt->params.disconnected.reason);
