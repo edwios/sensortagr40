@@ -11,12 +11,12 @@ $(OUTPUT_DIRECTORY)/nrf52832_xxaa.out: \
 # Source files common to all targets
 SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/mdk/gcc_startup_nrf52.S \
-  $(SDK_ROOT)/components/libraries/experimental_log/src/nrf_log_backend_rtt.c \
-  $(SDK_ROOT)/components/libraries/experimental_log/src/nrf_log_backend_serial.c \
-  $(SDK_ROOT)/components/libraries/experimental_log/src/nrf_log_backend_uart.c \
-  $(SDK_ROOT)/components/libraries/experimental_log/src/nrf_log_default_backends.c \
-  $(SDK_ROOT)/components/libraries/experimental_log/src/nrf_log_frontend.c \
-  $(SDK_ROOT)/components/libraries/experimental_log/src/nrf_log_str_formatter.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_backend_rtt.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_backend_serial.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_backend_uart.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_default_backends.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_frontend.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_str_formatter.c \
   $(SDK_ROOT)/components/libraries/button/app_button.c \
   $(SDK_ROOT)/components/libraries/util/app_error.c \
   $(SDK_ROOT)/components/libraries/util/app_error_handler_gcc.c \
@@ -32,11 +32,12 @@ SRC_FILES += \
   $(SDK_ROOT)/components/libraries/atomic_flags/nrf_atflags.c \
   $(SDK_ROOT)/components/libraries/atomic/nrf_atomic.c \
   $(SDK_ROOT)/components/libraries/balloc/nrf_balloc.c \
+  $(SDK_ROOT)/components/libraries/ringbuf/nrf_ringbuf.c \
   $(SDK_ROOT)/external/fprintf/nrf_fprintf.c \
   $(SDK_ROOT)/external/fprintf/nrf_fprintf_format.c \
   $(SDK_ROOT)/components/libraries/fstorage/nrf_fstorage.c \
   $(SDK_ROOT)/components/libraries/fstorage/nrf_fstorage_sd.c \
-  $(SDK_ROOT)/components/libraries/experimental_memobj/nrf_memobj.c \
+  $(SDK_ROOT)/components/libraries/memobj/nrf_memobj.c \
   $(SDK_ROOT)/components/libraries/pwr_mgmt/nrf_pwr_mgmt.c \
   $(SDK_ROOT)/components/libraries/experimental_section_vars/nrf_section_iter.c \
   $(SDK_ROOT)/components/libraries/strerror/nrf_strerror.c \
@@ -65,7 +66,6 @@ SRC_FILES += \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_printf.c \
   $(SDK_ROOT)/components/ble/common/ble_advdata.c \
   $(SDK_ROOT)/components/ble/ble_advertising/ble_advertising.c \
-  $(SDK_ROOT)/components/ble/ble_services/ble_dis/ble_dis.c \
   $(SDK_ROOT)/components/ble/common/ble_conn_params.c \
   $(SDK_ROOT)/components/ble/common/ble_conn_state.c \
   $(SDK_ROOT)/components/ble/common/ble_srv_common.c \
@@ -79,9 +79,9 @@ SRC_FILES += \
   $(SDK_ROOT)/components/ble/peer_manager/peer_id.c \
   $(SDK_ROOT)/components/ble/peer_manager/peer_manager.c \
   $(SDK_ROOT)/components/ble/peer_manager/pm_buffer.c \
-  $(SDK_ROOT)/components/ble/peer_manager/pm_mutex.c \
   $(SDK_ROOT)/components/ble/peer_manager/security_dispatcher.c \
   $(SDK_ROOT)/components/ble/peer_manager/security_manager.c \
+  $(SDK_ROOT)/components/ble/ble_services/ble_dis/ble_dis.c \
   $(SDK_ROOT)/components/softdevice/common/nrf_sdh.c \
   $(SDK_ROOT)/components/softdevice/common/nrf_sdh_ble.c \
   $(SDK_ROOT)/components/softdevice/common/nrf_sdh_soc.c \
@@ -112,23 +112,26 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/libraries/usbd/class/hid/generic \
   $(SDK_ROOT)/components/libraries/usbd/class/msc \
   $(SDK_ROOT)/components/libraries/usbd/class/hid \
-  $(SDK_ROOT)/modules/nrfx/hal \
-  $(SDK_ROOT)/components/libraries/experimental_log \
+  $(SDK_ROOT)/components/libraries/log \
+  $(SDK_ROOT)/components/libraries/log/src/ \
   $(SDK_ROOT)/components/ble/ble_services/ble_gls \
   $(SDK_ROOT)/components/libraries/fstorage \
   $(SDK_ROOT)/components/nfc/ndef/text \
   $(SDK_ROOT)/components/libraries/mutex \
   $(SDK_ROOT)/components/libraries/gpiote \
-  $(SDK_ROOT)/components/libraries/experimental_log/src \
+  $(SDK_ROOT)/components/libraries/log \
   $(SDK_ROOT)/components/libraries/bootloader/ble_dfu \
   $(SDK_ROOT)/components/nfc/ndef/connection_handover/common \
   $(SDK_ROOT)/components/boards \
   $(SDK_ROOT)/components/nfc/ndef/generic/record \
-  $(SDK_ROOT)/components/libraries/experimental_memobj \
+  $(SDK_ROOT)/components/libraries/memobj \
   $(SDK_ROOT)/components/nfc/t4t_parser/cc_file \
   $(SDK_ROOT)/components/ble/ble_advertising \
   $(SDK_ROOT)/components/ble/ble_services/ble_bas_c \
   $(SDK_ROOT)/modules/nrfx/drivers/include \
+  $(SDK_ROOT)/modules/nrfx/mdk \
+  $(SDK_ROOT)/modules/nrfx \
+  $(SDK_ROOT)/modules/nrfx/hal \
   $(SDK_ROOT)/components/libraries/experimental_task_manager \
   $(SDK_ROOT)/components/ble/ble_services/ble_hrs_c \
   $(SDK_ROOT)/components/nfc/ndef/connection_handover/le_oob_rec \
@@ -147,11 +150,10 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/ble/ble_services/ble_ans_c \
   $(SDK_ROOT)/components/libraries/slip \
   $(SDK_ROOT)/components/libraries/delay \
-  $(SDK_ROOT)/components/libraries/experimental_mpu \
+  $(SDK_ROOT)/components/libraries/mpu \
   $(SDK_ROOT)/components/libraries/mem_manager \
   $(SDK_ROOT)/components/libraries/csense_drv \
   $(SDK_ROOT)/components/ble/ble_services/ble_nus_c \
-  $(SDK_ROOT)/components/libraries/usbd/config \
   $(SDK_ROOT)/components/softdevice/common \
   $(SDK_ROOT)/components/ble/ble_services/ble_ias \
   $(SDK_ROOT)/components/libraries/usbd/class/hid/mouse \
@@ -181,12 +183,11 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/nfc/t4t_parser/tlv \
   $(SDK_ROOT)/components/libraries/sortlist \
   $(SDK_ROOT)/components/libraries/spi_mngr \
-  $(SDK_ROOT)/components/libraries/experimental_stack_guard \
+  $(SDK_ROOT)/components/libraries/stack_guard \
   $(SDK_ROOT)/components/libraries/led_softblink \
   $(SDK_ROOT)/components/nfc/ndef/conn_hand_parser \
   $(SDK_ROOT)/components/libraries/sdcard \
   $(SDK_ROOT)/components/nfc/ndef/parser/record \
-  $(SDK_ROOT)/modules/nrfx/mdk \
   $(SDK_ROOT)/components/ble/ble_services/ble_cts_c \
   $(SDK_ROOT)/components/nfc/ndef/conn_hand_parser/le_oob_rec_parser \
   $(SDK_ROOT)/components/ble/ble_services/ble_nus \
@@ -211,14 +212,14 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/ble/nrf_ble_qwr \
   $(SDK_ROOT)/components/libraries/gfx \
   $(SDK_ROOT)/components/libraries/button \
-  $(SDK_ROOT)/modules/nrfx \
   $(SDK_ROOT)/components/libraries/twi_sensor \
   $(SDK_ROOT)/integration/nrfx/legacy \
+  $(SDK_ROOT)/integration/nrfx \
   $(SDK_ROOT)/components/libraries/usbd/class/hid/kbd \
   $(SDK_ROOT)/components/nfc/ndef/connection_handover/ep_oob_rec \
   $(SDK_ROOT)/external/segger_rtt \
   $(SDK_ROOT)/components/libraries/atomic_fifo \
-  $(SDK_ROOT)/components/libraries/experimental_ringbuf \
+  $(SDK_ROOT)/components/libraries/ringbuf \
   $(SDK_ROOT)/components/ble/ble_services/ble_lbs_c \
   $(SDK_ROOT)/components/nfc/ndef/connection_handover/ble_pair_lib \
   $(SDK_ROOT)/components/libraries/crypto \
@@ -242,12 +243,18 @@ OPT = -O3 -g3
 # Uncomment the line below to enable link time optimization
 #OPT += -flto
 
+BOARD =? SENSORTAG_R40
 # C flags common to all targets
 CFLAGS += $(OPT)
-#CFLAGS += -DBOARD_PCA10040
-CFLAGS += -DBOARD_CUSTOM
-CFLAGS += -DSENSORTAG_R40
-CFLAGS += -DWITH_VEML6075
+ifneq ($(BOARD),)
+    CFLAGS += -D$(BOARD)
+    CFLAGS += -DBOARD_CUSTOM
+else
+    CFLAGS += -DBOARD_PCA10040
+endif
+ifneq ($(SENSOR),)
+    CFLAGS += -D$(SENSOR)
+endif
 CFLAGS += -DPOWERUP
 #CFLAGS += -DBASIC_SENSOR
 #CFLAGS += -DCONFIG_GPIO_AS_PINRESET
@@ -266,7 +273,7 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 # keep every function in a separate section, this allows linker to discard unused ones
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin -fshort-enums
-#CFLAGS += -DUSE_APP_CONFIG
+# CFLAGS += -DUSE_APP_CONFIG
 
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)

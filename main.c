@@ -79,6 +79,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "nordic_common.h"
 #include "nrf.h"
@@ -142,7 +143,7 @@
 #define DEVICE_NAME                     "EnvMultiIR"                         /**< Name of device. Will be included in the advertising data. */
 #endif
 #elif defined(BASIC_SENSOR)
-#define DEVICE_NAME                     "EnvMultiTH"                         /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "EvTH"                         /**< Name of device. Will be included in the advertising data. */
 #else
 #define DEVICE_NAME                     "BLE_GeNErIC"
 #endif
@@ -151,15 +152,16 @@
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
-#define APP_ADV_INTERVAL                3000                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
-//#define APP_ADV_INTERVAL                300                                     /**< The advertising interval (in units of 0.625 ms. This value corresponds to 0.1875 s). */
+//#define APP_ADV_INTERVAL                64                                      /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
+#define APP_ADV_INTERVAL                300                                   /**< The advertising interval (in units of 0.625 ms. This value corresponds to 0.1875 s). */
+//#define APP_ADV_TIMEOUT_IN_SECONDS      BLE_GAP_ADV_TIMEOUT_LIMITED_MAX       /**< The advertising timeout in units of seconds. */
 #define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
 
-#define APP_BLE_OBSERVER_PRIO           1                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
+#define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(400, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (0.2 second). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(500, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)       /**< Maximum acceptable connection interval (0.2 second). */
 #define SLAVE_LATENCY                   0                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
 
@@ -177,7 +179,8 @@
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
 #define TEMP_TYPE_AS_CHARACTERISTIC     1                                       /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
-#define MAX_READS                       100                                     /**< Max number of sensor reads, then disconnect */
+//#define MAX_READS                       100                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
+#define MAX_READS                       0                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
 #define READS_UNTIL_UPDATE              5                                       /**< Update to GATT until after 4 reads */
 
 #ifdef POWERUP
@@ -188,19 +191,25 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-#define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(500)                   // 1000 ms intervals
+#define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(1000)                   // 1000 ms intervals
+#define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(7000)                   // 1000 ms intervals
+#define LED_BLINK_INTERVAL              5                                      // LED blinks 20ms
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
 #define UART_RX_BUF_SIZE 32
+
+#define LED_ADV                         BSP_LED_1_MASK
+#define LED_CONN                        BSP_LED_2_MASK
 
 //BLE_NUS_DEF(m_nus);                                                             /**< BLE NUS service instance. */
 NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 BLE_ADVERTISING_DEF(m_advertising);                                             /**< Advertising module instance. */
 APP_TIMER_DEF(m_timer_accel_update_id);
-
+APP_TIMER_DEF(m_timer_led_id);
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
+static bool m_isAdvertising = false;
 //static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;          /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static ble_envsense_t m_ble_envsense;
 static uint8_t read_counts = 0;
@@ -238,6 +247,18 @@ static ble_uuid_t m_adv_uuids[] =                                               
 void timer_accel_update_handler(void * p_context)
 {
     start_accel_update_flag = true;
+}
+
+void timer_led_handler(void * p_context)
+{
+    if (m_isAdvertising) {
+        LEDS_ON(BSP_LED_2_MASK);
+    }
+    if (m_conn_handle != BLE_CONN_HANDLE_INVALID) {
+        LEDS_ON(BSP_LED_1_MASK);
+    }
+    nrf_delay_ms(LED_BLINK_INTERVAL);
+    bsp_indication_set(BSP_INDICATE_IDLE);
 }
 
 static void advertising_start(bool erase_bonds);
@@ -436,8 +457,10 @@ static void timers_init(void)
                  For every new timer needed, increase the value of the macro APP_TIMER_MAX_TIMERS by
                  one.
     */
-        err_code = app_timer_create(&m_timer_accel_update_id, APP_TIMER_MODE_REPEATED, timer_accel_update_handler);
-       APP_ERROR_CHECK(err_code);
+    err_code = app_timer_create(&m_timer_accel_update_id, APP_TIMER_MODE_REPEATED, timer_accel_update_handler);
+    APP_ERROR_CHECK(err_code);
+    err_code = app_timer_create(&m_timer_led_id, APP_TIMER_MODE_REPEATED, timer_led_handler);
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -627,8 +650,7 @@ static void services_init(void)
     sys_id.organizationally_unique_id = ORG_UNIQUE_ID;
     dis_init.p_sys_id                 = &sys_id;
 
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&dis_init.dis_attr_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&dis_init.dis_attr_md.write_perm);
+    dis_init.dis_char_rd_sec = SEC_OPEN;
 
     err_code = ble_dis_init(&dis_init);
     APP_ERROR_CHECK(err_code);
@@ -697,9 +719,20 @@ static void conn_params_init(void)
 static void application_timers_start(void)
 {
     /* YOUR_JOB: Start your timers. below is an example of how to start a timer. */
-       ret_code_t err_code;
+        ret_code_t err_code;
         err_code = app_timer_start(m_timer_accel_update_id, TIMER_INTERVAL_ACCEL_UPDATE, NULL);
-       APP_ERROR_CHECK(err_code);
+        APP_ERROR_CHECK(err_code);
+
+}
+
+/**@brief Function for starting LED timer.
+ */
+static void led_timers_start(void)
+{
+    /* YOUR_JOB: Start your timers. below is an example of how to start a timer. */
+        ret_code_t err_code;
+        err_code = app_timer_start(m_timer_led_id, TIMER_INTERVAL_LED_FLASH, NULL);
+        APP_ERROR_CHECK(err_code);
 
 }
 
@@ -708,10 +741,19 @@ static void application_timers_start(void)
 static void application_timers_stop(void)
 {
     /* YOUR_JOB: Stop your timers. below is an example of how to stop a timer. */
-       ret_code_t err_code;
+        ret_code_t err_code;
         err_code = app_timer_stop(m_timer_accel_update_id);
-       APP_ERROR_CHECK(err_code);
+        APP_ERROR_CHECK(err_code);
+}
 
+/**@brief Function for stopping timers.
+ */
+static void led_timers_stop(void)
+{
+    /* YOUR_JOB: Stop your timers. below is an example of how to stop a timer. */
+        ret_code_t err_code;
+        err_code = app_timer_stop(m_timer_led_id);
+        APP_ERROR_CHECK(err_code);
 }
 
 /**@brief Function for putting the chip into sleep mode.
@@ -727,6 +769,9 @@ static void sleep_mode_enter(void)
     ///err_code = bsp_indication_set(BSP_INDICATE_IDLE);
     ///APP_ERROR_CHECK(err_code);
 
+    // Stop all timers, no matter
+    application_timers_stop();
+    led_timers_stop();
     // Prepare wakeup buttons.
     err_code = bsp_btn_ble_sleep_mode_prepare();
     APP_ERROR_CHECK(err_code);
@@ -766,13 +811,19 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
             //---NRF_LOG_DEBUG("Fast advertising."); //---NRF_LOG_FLUSH();
             ///err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
             ///APP_ERROR_CHECK(err_code);
+            m_isAdvertising = true;
+            // Refresh LED immediately
+            timer_led_handler(0);
             break;
 
         case BLE_ADV_EVT_IDLE:
             //---NRF_LOG_DEBUG("Advertising Event Idle."); //---NRF_LOG_FLUSH();
             // sleep_mode_enter();  // do not sleep when fast advertise is done (180s)
-            err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_SLOW);
+            err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
             APP_ERROR_CHECK(err_code);
+            m_isAdvertising = true;
+            // Refresh LED immediately
+            timer_led_handler(0);
             break;
 
         default:
@@ -791,9 +842,9 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
     m_ble_envsense.conn_handle = p_gap_evt->conn_handle; 
     err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
     APP_ERROR_CHECK(err_code);
-#ifdef POWERUP
-    bsp_board_led_on(BSP_BOARD_LED_1);
-#endif
+    m_isAdvertising = false;
+    // Refresh LED immediately
+    timer_led_handler(0);
 #if (USE_MPU)
     mpu_sleep(false);       // Wake up MPU
     m_mpu.conn_handle = p_gap_evt->conn_handle;
@@ -1068,7 +1119,6 @@ static void advertising_init(void)
     ret_code_t              err_code;
     ble_advertising_init_t  init;
 
-    //---NRF_LOG_DEBUG("Initialising Advertising"); //---NRF_LOG_FLUSH();
     memset(&init, 0, sizeof(init));
 
     init.advdata.name_type               = BLE_ADVDATA_FULL_NAME;
@@ -1150,7 +1200,7 @@ static void advertising_start(bool erase_bonds)
     else
     {
         ret_code_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
-
+        m_isAdvertising = true;
         APP_ERROR_CHECK(err_code);
     }
 }
@@ -1293,7 +1343,7 @@ int main(void)
     nrf_gpio_pin_set(FLASH_CS);
 #endif
     log_init();
-    NRF_LOG_INFO("\033[2J\033[;HSensorTag R40. Compiled @ %s.\r\n", nrf_log_push(__TIME__));
+    NRF_LOG_INFO("\033[2J\033[;BASIC_SENSOR. Compiled @ %s.\r\n", nrf_log_push(__TIME__));
     NRF_LOG_FLUSH();
 //    uart_init();  NRF_UART0->ENABLE = 1;
     timers_init();
@@ -1343,12 +1393,12 @@ int main(void)
 
     //nrf_gpio_pin_set(LED_3);
 //    nrf_gpio_cfg_sense_input(BUTTON1, NRF_GPIO_PIN_PULLUP, NRF_GPIO_PIN_SENSE_LOW);
-
+    led_timers_start();
     advertising_start(erase_bonds);
     bsp_indication_set(BSP_INDICATE_IDLE);
 
     // Start execution.
-    NRF_LOG_DEBUG("%s", nrf_log_push("SensorTag R40 started."));
+    NRF_LOG_DEBUG("%s", nrf_log_push("BASIC_SENSOR started."));
     NRF_LOG_FLUSH();
 
     // Enter main loop.
@@ -1356,7 +1406,6 @@ int main(void)
     {
         if (NRF_LOG_PROCESS() == false)
         {
-            nrf_pwr_mgmt_run();
             if(start_accel_update_flag == true)
             {
 #if (USE_MPU)
@@ -1466,16 +1515,20 @@ int main(void)
 #endif
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
 #ifdef AUTO_DISCONNECT
-                ret_code_t err_code;
-                if (!start_accel_update_flag) read_counts++;
-                if (read_counts > MAX_READS) {
-                    read_counts = 0;
-                    NRF_LOG_INFO("Enough sensor reads, disconnecting"); NRF_LOG_FLUSH();
-                    if (m_ble_envsense.conn_handle != BLE_CONN_HANDLE_INVALID) {
+                if (MAX_READS > 0) {    // Auto-disconnect enabled
+                    ret_code_t err_code;
+                    if (!start_accel_update_flag) read_counts++;
+                    if (read_counts > MAX_READS) {
+                        read_counts = 0;
+                        NRF_LOG_INFO("Enough sensor reads, disconnecting"); NRF_LOG_FLUSH();
+                        if (m_ble_envsense.conn_handle != BLE_CONN_HANDLE_INVALID) {
 
-                        err_code = sd_ble_gap_disconnect(m_ble_envsense.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-                        APP_ERROR_CHECK(err_code);
+                            err_code = sd_ble_gap_disconnect(m_ble_envsense.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+                            APP_ERROR_CHECK(err_code);
+                        }
                     }
+                } else {
+                    read_counts = READS_UNTIL_UPDATE+1;
                 }
 #else
                 read_counts = READS_UNTIL_UPDATE+1;
@@ -1491,6 +1544,7 @@ int main(void)
                 bmp280_read = false;
 #endif
             }
+            nrf_pwr_mgmt_run();
         }
     }
 }

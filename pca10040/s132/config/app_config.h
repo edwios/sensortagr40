@@ -36,7 +36,7 @@
 
 #define BUTTON_ENABLED 1
 
-#define NRF_LOG_ENABLED 0					// Use Log
+#define NRF_LOG_ENABLED 1					// Use Log
 #define NRF_LOG_DEFERRED 1					// Buffered, may need to increase buffer size
 // <0=> SKIP 
 // <1=> TRIM 

@@ -51,9 +51,9 @@ extern "C" {
 #define LEDS_NUMBER    3
 
 #define LED_START      28
-#define LED_1          29
+#define LED_1          27
 #define LED_2          28
-#define LED_3          27
+#define LED_3          29
 //#define LED_4          27
 #define LED_STOP       29
 

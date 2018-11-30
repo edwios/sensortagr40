@@ -153,7 +153,7 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
         humidity_values = (uint8_t *)(env_values+6*sizeof(uint8_t));
     }
     int32_t adc_T = (((uint32_t)(temperature_values[0]) << 12) | ((uint32_t)(temperature_values[1]) << 4) | ((uint32_t)(temperature_values[2]) >> 4));
-    int32_t adc_P = (((uint32_t)(pressure_values[0]) << 12) | (((uint32_t)pressure_values[1]) << 4) | ((uint32_t)(pressure_values[2]) >> 4));
+    int32_t adc_P = (((uint32_t)(pressure_values[0]) << 16) | (((uint32_t)pressure_values[1]) << 8) | ((uint32_t)(pressure_values[2])));
 
     var1  = ((((adc_T>>3) - ((int32_t)_bmp280_calib.dig_T1 <<1))) *
         ((int32_t)_bmp280_calib.dig_T2)) >> 11;
@@ -163,6 +163,10 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     t_fine = var1 + var2;
     bmp280_ambient_values->ambient_temperature_value = (t_fine * 5 + 128) >> 8;
 
+// Calculate the pressure, return in Pascal (=100hBar)
+
+    adc_P >>= 4;
+    
 #ifdef USE_FLOAT
     double fvar1, fvar2, fp;
     fvar1 = ((double)t_fine/2.0) - 64000.0;
@@ -178,7 +182,7 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
     fp = (fp - (fvar2 / 4096.0)) * 6250.0 / fvar1;
     fvar1 = ((double)_bmp280_calib.dig_P9) * fp * fp / 2147483648.0;
     fvar2 = fp * ((double)_bmp280_calib.dig_P8) / 32768.0;
-    p = round(fp + (fvar1 + fvar2 + ((double)_bmp280_calib.dig_P7)) / 16.0); 
+    p = round(fp + (fvar1 + fvar2 + ((double)_bmp280_calib.dig_P7)) / 16.0);
 #else
     int64_t v1, v2;
     v1 = ((int64_t)t_fine) - 128000;
@@ -199,27 +203,8 @@ uint32_t bmp280_read_ambient(bmp280_ambient_values_t * bmp280_ambient_values)
 
     p = ((p + v1 + v2) >> 8) + (((int64_t)_bmp280_calib.dig_P7)<<4);
     p = (uint32_t)(p/256); // Has to /2, because of filter??
-    /*
-    v1 = (((int32_t)t_fine)>>1) - (int32_t)64000;
-    v2 = (((v1>>2) * (v1>>2)) >> 11 ) * ((int32_t)_bmp280_calib.dig_P6);
-    v2 = v2 + ((v1*((int32_t)_bmp280_calib.dig_P5))<<1);
-    v2 = (v2>>2)+(((int32_t)_bmp280_calib.dig_P4)<<16);
-    v1 = (((_bmp280_calib.dig_P3 * (((v1>>2) * (v1>>2)) >> 13 )) >> 3) + ((((int32_t)_bmp280_calib.dig_P2) * v1)>>1))>>18; v1 =((((32768+v1))*((int32_t)_bmp280_calib.dig_P1))>>15);
-    if (v1 == 0) {
-        return 0; // avoid exception caused by division by zero
-    }
-    p = (((uint32_t)(((int32_t)1048576)-adc_P)-(v2>>12)))*3125;
-    if (p < 0x80000000) {
-        p = (p << 1) / ((uint32_t)v1);
-    } else {
-        p = (p / (uint32_t)v1) * 2;
-    }
-    v1 = (((int32_t)_bmp280_calib.dig_P9) * ((int32_t)(((p>>3) * (p>>3))>>13)))>>12; v2 = (((int32_t)(p>>2)) * ((int32_t)_bmp280_calib.dig_P8))>>13;
-    p = (uint32_t)((int32_t)p + ((v1 + v2 + _bmp280_calib.dig_P7) >> 4));
-    */
 #endif
-
-    bmp280_ambient_values->ambient_pressure_value = p;
+    bmp280_ambient_values->ambient_pressure_value = p/100;
     bmp280_ambient_values->ambient_humidity_value = 0;
 
     /** For BME280 only **/
