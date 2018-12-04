@@ -59,7 +59,7 @@
 #define USE_BMP280                      0   // mixed sensors todo
 #endif
 #if defined (SENSORTAG_R40)
-#if defined(WITH_VEML6075)
+#if defined(VEML6075)
 #define USE_VEML6075                    1
 #define USE_AP3216C                     0
 #define USE_LTR329                      0
@@ -160,14 +160,14 @@
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(500, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)       /**< Maximum acceptable connection interval (0.2 second). */
-#define SLAVE_LATENCY                   0                                       /**< Slave latency. */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(400, UNIT_1_25_MS)       /**< Maximum acceptable connection interval (0.2 second). */
+#define SLAVE_LATENCY                   2                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
 
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000)                  /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
-#define MAX_CONN_PARAMS_UPDATE_COUNT    3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
+#define MAX_CONN_PARAMS_UPDATE_COUNT    6                                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
 #define SEC_PARAM_BOND                  1                                       /**< Perform bonding. */
 #define SEC_PARAM_MITM                  0                                       /**< Man In The Middle protection not required. */
@@ -192,7 +192,7 @@
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 #define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(1000)                   // 1000 ms intervals
-#define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(7000)                   // 1000 ms intervals
+#define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(5000)                   // 1000 ms intervals
 #define LED_BLINK_INTERVAL              5                                      // LED blinks 20ms
 
 /*UART buffer size. */
@@ -939,7 +939,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GATTC_EVT_TIMEOUT:
             // Disconnect on GATT Client timeout event.
-            NRF_LOG_DEBUG("GATT Client Timeout.");
+            NRF_LOG_DEBUG("GATT Client Timeout."); NRF_LOG_FLUSH();
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -947,7 +947,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GATTS_EVT_TIMEOUT:
             // Disconnect on GATT Server timeout event.
-            NRF_LOG_DEBUG("GATT Server Timeout.");
+            NRF_LOG_DEBUG("GATT Server Timeout."); NRF_LOG_FLUSH();
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -1087,6 +1087,7 @@ static void bsp_event_handler(bsp_event_t event)
             break; // BSP_EVENT_SLEEP
 
         case BSP_EVENT_DISCONNECT:
+            NRF_LOG_DEBUG("BSP event disconnect"); NRF_LOG_FLUSH();
             err_code = sd_ble_gap_disconnect(m_conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             if (err_code != NRF_ERROR_INVALID_STATE)

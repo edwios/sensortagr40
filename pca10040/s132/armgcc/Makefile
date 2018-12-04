@@ -8,6 +8,8 @@ PROJ_DIR := ../../..
 $(OUTPUT_DIRECTORY)/nrf52832_xxaa.out: \
   LINKER_SCRIPT  := ble_app_envsense_gcc_nrf52.ld
 
+BOARD =? SENSORTAG_R40
+
 # Source files common to all targets
 SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/mdk/gcc_startup_nrf52.S \
@@ -90,10 +92,13 @@ SRC_FILES += \
   $(PROJ_DIR)/nrf_drv_veml6075_twi.c \
   $(PROJ_DIR)/app_ap3216c.c \
   $(PROJ_DIR)/ble_ap3216c.c \
-  $(PROJ_DIR)/nrf_drv_ap3216c_twi.c \
+  $(PROJ_DIR)/nrf_drv_ap3216c_twi.c
+ifneq ($(BOARD),SENSORTAG)
+  SRC_FILES += \
   $(PROJ_DIR)/app_bmp280.c \
   $(PROJ_DIR)/ble_bmp280.c \
-  $(PROJ_DIR)/nrf_drv_bmp280_twi.c \
+  $(PROJ_DIR)/nrf_drv_bmp280_twi.c
+endif
 
 #  $(PROJ_DIR)/app_mpu.c \
 #  $(PROJ_DIR)/ble_mpu.c \
@@ -243,7 +248,6 @@ OPT = -O3 -g3
 # Uncomment the line below to enable link time optimization
 #OPT += -flto
 
-BOARD =? SENSORTAG_R40
 # C flags common to all targets
 CFLAGS += $(OPT)
 ifneq ($(BOARD),)
@@ -255,6 +259,8 @@ endif
 ifneq ($(SENSOR),)
     CFLAGS += -D$(SENSOR)
 endif
+
+
 CFLAGS += -DPOWERUP
 #CFLAGS += -DBASIC_SENSOR
 #CFLAGS += -DCONFIG_GPIO_AS_PINRESET
@@ -345,8 +351,8 @@ flash: $(OUTPUT_DIRECTORY)/nrf52832_xxaa.hex
 
 # Flash softdevice
 flash_softdevice:
-	@echo Flashing: s132_nrf52_6.0.0_softdevice.hex
-	nrfjprog -f nrf52 --program $(SDK_ROOT)/components/softdevice/s132/hex/s132_nrf52_6.0.0_softdevice.hex --sectorerase
+	@echo Flashing: s132_nrf52_6.1.0_softdevice.hex
+	nrfjprog -f nrf52 --program $(SDK_ROOT)/components/softdevice/s132/hex/s132_nrf52_6.1.0_softdevice.hex --sectorerase
 	nrfjprog -f nrf52 --reset
 
 erase:

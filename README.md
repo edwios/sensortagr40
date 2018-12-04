@@ -31,10 +31,12 @@ _NRF_SDH_BLE_VS_UUID_COUNT_ is very important. It *MUST* match the VS UUID count
 ## Board variations
 
 ### Basic Sensor
-Define by adding CFLAGS += -DBASIC_SENSOR in Makefile
+make BOARD=BASIC_SENSOR
+Or define by adding CFLAGS += -DBASIC_SENSOR in Makefile
 
 ### SensorTag R40
-Define by adding CFLAGS += -DSENSORTAG_R40 in Makefile
+make BOARD=SENSORTAG_R40
+Or define by adding CFLAGS += -DSENSORTAG_R40 in Makefile
 
 ### AC Powered
 Define by adding CFLASG += -DPOWERUP in Makefile
@@ -43,8 +45,8 @@ Define by adding CFLASG += -DPOWERUP in Makefile
 ##Other board variations
 
 ### Board with external VEML6075 UV sensor
-
-In main.c
+make SENSOR=VME6075
+Or, in main.c
 Change `USE_VME6075` to 1
 Change `USE_AP3216C` to 0
 
@@ -56,7 +58,7 @@ Change `USE_VME6075` to 0
 
 ## Compile and flash
 ```cd pca10040/s132/armgcc
-make
+make [BOARD=...] [SENSOR=...]
 nrfjprog --recover
 make flash_softdevice
 make flash

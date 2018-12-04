@@ -28,6 +28,7 @@ xcuserdata/
 *.o
 *.in
 *.out
+*.log
 
 ## Obj-C/Swift specific
 *.hmap

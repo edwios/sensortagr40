@@ -135,6 +135,63 @@ extern "C" {
 #define SPIM0_MISO_PIN  15 // SPI Master In Slave Out GPIO pin number.
 #define SPIM0_SS_PIN    18 // SPI Slave Select GPIO pin number.
 
+#elif defined (SENSORTAG)
+
+// LEDs definitions for SENSORTAG
+#define LEDS_NUMBER    3
+
+#define LED_START      25
+#define LED_1          25
+#define LED_2          26
+#define LED_3          27
+//#define LED_4          27
+#define LED_STOP       27
+
+#define LEDS_ACTIVE_STATE 0
+
+#define LEDS_INV_MASK  LEDS_MASK
+
+//#define LEDS_LIST { LED_1, LED_2, LED_3, LED_4 }
+#define LEDS_LIST { LED_1, LED_2, LED_3 }
+
+#define BSP_LED_0      LED_1
+#define BSP_LED_1      LED_2
+#define BSP_LED_2      LED_3
+//#define BSP_LED_3      LED_4
+
+#define BUTTONS_NUMBER 1
+
+#define BUTTON_START   11
+#define BUTTON_1       11
+//#define BUTTON_3       11
+//#define BUTTON_4       11
+#define BUTTON_STOP    11
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLDOWN
+
+#define BUTTONS_ACTIVE_STATE 1
+
+//#define BUTTONS_LIST { BUTTON_1, BUTTON_2, BUTTON_3, BUTTON_4 }
+#define BUTTONS_LIST { BUTTON_1 }
+
+#define BSP_BUTTON_0   BUTTON_1
+//#define BSP_BUTTON_2   BUTTON_3
+//#define BSP_BUTTON_3   BUTTON_4
+
+#define RX_PIN_NUMBER  17
+#define TX_PIN_NUMBER  18
+#define CTS_PIN_NUMBER 19
+#define RTS_PIN_NUMBER 20
+#define HWFC           false
+#define INT_9255		7	// MPU interrupt
+#define SPIM0_SCK_PIN   5  // SPI clock GPIO pin number.
+#define SPIM0_MOSI_PIN  4  // SPI Master Out Slave In GPIO pin number.
+#define SPIM0_MISO_PIN  3 // SPI Master In Slave Out GPIO pin number.
+#define SPIM0_SS_PIN    6 // SPI Slave Select GPIO pin number.
+#define SPIM1_SCK_PIN   29  // SPI clock GPIO pin number.
+#define SPIM1_MOSI_PIN  28  // SPI Master Out Slave In GPIO pin number.
+#define SPIM1_MISO_PIN  30 // SPI Master In Slave Out GPIO pin number.
+#define SPIM1_SS_PIN    31 // SPI Slave Select GPIO pin number.
+
 #endif
 
 /**@ Misc defines for other I/O such as SPIS and SPIM1,2
