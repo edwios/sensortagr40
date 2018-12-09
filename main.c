@@ -133,6 +133,10 @@
 #include "app_ap3216c.h"
 #include "ble_ap3216c.h"
 #endif
+#if (USE_LTR329)
+#include "app_ltr329.h"
+#include "ble_ltr329.h"
+#endif
 
 
 #define APP_FEATURE_NOT_SUPPORTED       BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2    /**< Reply when unsupported features are requested. */
@@ -144,6 +148,8 @@
 #endif
 #elif defined(BASIC_SENSOR)
 #define DEVICE_NAME                     "EvTH"                         /**< Name of device. Will be included in the advertising data. */
+#elif defined(SENSORTAG)
+#define DEVICE_NAME                     "EvAL"
 #else
 #define DEVICE_NAME                     "BLE_GeNErIC"
 #endif
@@ -193,7 +199,7 @@
 
 #define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(1000)                   // 1000 ms intervals
 #define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(5000)                   // 1000 ms intervals
-#define LED_BLINK_INTERVAL              5                                      // LED blinks 20ms
+#define LED_BLINK_INTERVAL              1                                       // LED blinks 20ms
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
@@ -227,6 +233,9 @@ bmp280_ambient_values_t m_bmpambient;
 #endif
 #if (USE_AP3216C)
 ap3216c_ambient_values_t m_ap3216cambient;
+#endif
+#if (USE_LTR329)
+ltr329_ambient_values_t m_ltr329ambient;
 #endif
 
 bool start_accel_update_flag = false;
@@ -629,6 +638,9 @@ static void services_init(void)
 #if (USE_BMP280)
     ble_bmp280_service_init(&m_ble_envsense);
 #endif
+#if (USE_LTR329)
+    ble_ltr329_service_init(&m_ble_envsense);
+#endif
     
     // Here the sec level for the Health Thermometer Service can be changed/increased.
     /*
@@ -789,6 +801,10 @@ static void sleep_mode_enter(void)
 #if (USE_BMP280)
     bmp280_config_deactivate();
 #endif
+#if (USE_LTR329)
+    ltr329_config_deactivate();
+#endif
+
     // Go to system-off mode (this function will not return; wakeup will cause a reset).
     err_code = sd_power_system_off();
     APP_ERROR_CHECK(err_code);
@@ -860,6 +876,11 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
     bmp280_config_activate();
     bmp280_config();
 #endif
+#if (USE_LTR329)
+    ltr329_config_activate();
+    ltr329_config();
+#endif
+
     start_accel_update_flag = true;
     application_timers_start();
     // Optional to re-start advertising if multiple connections (periph_link_cnt < Max allowed)
@@ -888,6 +909,9 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 #endif
 #if (USE_BMP280)
     bmp280_config_deactivate();
+#endif
+#if (USE_LTR329)
+    ltr329_config_deactivate();
 #endif
     err_code = bsp_indication_set(BSP_INDICATE_IDLE);
     APP_ERROR_CHECK(err_code);
@@ -1330,6 +1354,10 @@ int main(void)
 #if (USE_AP3216C)
     bool ap3216c_read=false;
 #endif
+#if (USE_LTR329)
+    bool ltr329_read=false;
+    ltr329_part_id_t ltr329_partid;
+#endif
 
 //    NRF_POWER->DCDCEN = 1;  
 
@@ -1360,7 +1388,7 @@ int main(void)
     peer_manager_init();
 
     /** Comment the following if without L4 and L5 on custom board */
-#if defined(BASIC_SENSOR)
+#if defined(BASIC_SENSOR) || defined(SENSORTAG)
     sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
 #endif
 
@@ -1383,6 +1411,11 @@ int main(void)
     ap3216c_init();
     ap3216c_config();
     ap3216c_config_deactivate();
+#endif
+#if (USE_LTR329)
+    ltr329_init();
+    ltr329_config();
+    ltr329_config_deactivate();
 #endif
 #if (USE_MPU)
     accel_values_t accel_values, last_accel_values;
@@ -1442,6 +1475,16 @@ int main(void)
                         NRF_LOG_DEBUG("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
                     }
                     bmp280_read = true;
+                }
+#endif
+#if (USE_LTR329)
+                if (ltr329_has_new_data()) {
+                    ltr329_read_partid(&ltr329_partid);
+                    ltr329_read_ambient(&m_ltr329ambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_DEBUG("LTR329 Ambient: Lux %d, Vis %d, IR %d", m_ltr329ambient.ambient_lux_value, m_ltr329ambient.ambient_visible_value, m_ltr329ambient.ambient_ir_value);
+                    }
+                    ltr329_read = true;
                 }
 #endif
 #if (USE_MPU)
@@ -1513,7 +1556,17 @@ int main(void)
                         NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
                     }
                 }
+#elif (USE_LTR329)
+                if (ltr329_read) {
+                    ltr329_read = false;
+                    start_accel_update_flag = false;
+                    if (read_counts > READS_UNTIL_UPDATE) ble_ltr329_update(&m_ble_envsense, &m_ltr329ambient);
+                    if (read_counts > READS_UNTIL_UPDATE) {
+                        NRF_LOG_INFO("LTR329 Ambient: Lux %d, Vis %d, IR %d", m_ltr329ambient.ambient_lux_value, m_ltr329ambient.ambient_visible_value, m_ltr329ambient.ambient_ir_value);
+                    }
+                }                
 #endif
+
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
 #ifdef AUTO_DISCONNECT
                 if (MAX_READS > 0) {    // Auto-disconnect enabled
@@ -1543,6 +1596,9 @@ int main(void)
 #endif
 #if (USE_BMP280)
                 bmp280_read = false;
+#endif
+#if (USE_LTR329)
+                ltr329_read = false;
 #endif
             }
             nrf_pwr_mgmt_run();

@@ -180,7 +180,7 @@ static uint32_t ble_char_lux_add(ble_envsense_t * p_ltr329)
  */
 void ble_ltr329_service_init(ble_envsense_t * p_ltr329)
 {
-    uint32_t   err_code; // Variable to hold return codes from library and softdevice functions
+//    uint32_t   err_code; // Variable to hold return codes from library and softdevice functions
 /*
     ble_uuid_t        service_uuid;
     ble_uuid128_t     base_uuid = {BLE_UUID_BASE_UUID};
