@@ -93,7 +93,7 @@ SRC_FILES += \
   $(PROJ_DIR)/app_ap3216c.c \
   $(PROJ_DIR)/ble_ap3216c.c \
   $(PROJ_DIR)/nrf_drv_ap3216c_twi.c
-ifneq (, $(filter $(BOARD),SENSORTAG SENSORTAG_R40))
+ifeq (, $(filter $(BOARD),SENSORTAG SENSORTAG_R40))
   SRC_FILES += \
   $(PROJ_DIR)/app_bmp280.c \
   $(PROJ_DIR)/ble_bmp280.c \
