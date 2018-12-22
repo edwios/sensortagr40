@@ -8,7 +8,8 @@ PROJ_DIR := ../../..
 $(OUTPUT_DIRECTORY)/nrf52832_xxaa.out: \
   LINKER_SCRIPT  := ble_app_envsense_gcc_nrf52.ld
 
-BOARD =? SENSORTAG_R40
+BOARD ?= SENSORTAG_R40
+BATTERY ?= 1
 
 # Source files common to all targets
 SRC_FILES += \
@@ -89,16 +90,20 @@ SRC_FILES += \
   $(SDK_ROOT)/components/softdevice/common/nrf_sdh_soc.c \
   $(PROJ_DIR)/app_veml6075.c \
   $(PROJ_DIR)/ble_veml6075.c \
-  $(PROJ_DIR)/nrf_drv_veml6075_twi.c \
+  $(PROJ_DIR)/nrf_drv_veml6075_twi.c
+ifeq ($(BOARD),SENSORTAG_R40)
+  SRC_FILES += \
   $(PROJ_DIR)/app_ap3216c.c \
   $(PROJ_DIR)/ble_ap3216c.c \
   $(PROJ_DIR)/nrf_drv_ap3216c_twi.c
-ifeq (, $(filter $(BOARD),SENSORTAG SENSORTAG_R40))
+endif
+ifneq (, $(filter $(BOARD),SENSORTAG_R40 BASIC_SENSOR))
   SRC_FILES += \
   $(PROJ_DIR)/app_bmp280.c \
   $(PROJ_DIR)/ble_bmp280.c \
   $(PROJ_DIR)/nrf_drv_bmp280_twi.c
-else
+endif
+ifeq ($(BOARD),SENSORTAG)
   SRC_FILES += \
   $(PROJ_DIR)/app_ltr329.c \
   $(PROJ_DIR)/ble_ltr329.c \
@@ -264,9 +269,9 @@ endif
 ifneq ($(SENSOR),)
     CFLAGS += -D$(SENSOR)
 endif
-
-
+ifeq ($(BATTERY),1)
 CFLAGS += -DPOWERUP
+endif
 #CFLAGS += -DBASIC_SENSOR
 #CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 CFLAGS += -DFLOAT_ABI_HARD

@@ -158,10 +158,10 @@
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
-//#define APP_ADV_INTERVAL                64                                      /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1.875 s). */
-#define APP_ADV_INTERVAL                300                                   /**< The advertising interval (in units of 0.625 ms. This value corresponds to 0.1875 s). */
-//#define APP_ADV_TIMEOUT_IN_SECONDS      BLE_GAP_ADV_TIMEOUT_LIMITED_MAX       /**< The advertising timeout in units of seconds. */
-#define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
+#define APP_ADV_INTERVAL                32                                      /**< The advertising interval (in units of 0.625 ms. This value corresponds to 20 s). */
+#define APP_ADV_SLOW_INTERVAL           1636                                    /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1022.5 ms). */
+#define APP_ADV_TIMEOUT_IN_SECONDS      BLE_GAP_ADV_TIMEOUT_LIMITED_MAX       /**< The advertising timeout in units of seconds. */
+//#define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
 
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
@@ -185,8 +185,8 @@
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
 #define TEMP_TYPE_AS_CHARACTERISTIC     1                                       /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
-//#define MAX_READS                       100                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
-#define MAX_READS                       0                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
+#define MAX_READS                       30                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
+//#define MAX_READS                       0                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
 #define READS_UNTIL_UPDATE              5                                       /**< Update to GATT until after 4 reads */
 
 #ifdef POWERUP
@@ -198,6 +198,7 @@
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 #define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(1000)                   // 1000 ms intervals
+#define TIMER_INTERVAL_FAST_UPDATE      APP_TIMER_TICKS(200)                    // 200ms fast interval update
 #define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(5000)                   // 1000 ms intervals
 #define LED_BLINK_INTERVAL              1                                       // LED blinks 20ms
 
@@ -213,13 +214,16 @@ NRF_BLE_QWR_DEF(m_qwr);                                                         
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 BLE_ADVERTISING_DEF(m_advertising);                                             /**< Advertising module instance. */
 APP_TIMER_DEF(m_timer_accel_update_id);
+APP_TIMER_DEF(m_timer_fast_update_id);
+#ifndef POWERUP
 APP_TIMER_DEF(m_timer_led_id);
+#endif
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
 static bool m_isAdvertising = false;
 //static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;          /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static ble_envsense_t m_ble_envsense;
 static uint8_t read_counts = 0;
-
+static bool all_read = false;
 
 #if (USE_MPU)
 ble_mpu_t m_mpu;
@@ -271,6 +275,7 @@ void timer_led_handler(void * p_context)
 }
 
 static void advertising_start(bool erase_bonds);
+static void application_timers_stop(void);
 
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -468,8 +473,12 @@ static void timers_init(void)
     */
     err_code = app_timer_create(&m_timer_accel_update_id, APP_TIMER_MODE_REPEATED, timer_accel_update_handler);
     APP_ERROR_CHECK(err_code);
+    err_code = app_timer_create(&m_timer_fast_update_id, APP_TIMER_MODE_REPEATED, timer_accel_update_handler);
+    APP_ERROR_CHECK(err_code);
+#ifndef POWERUP
     err_code = app_timer_create(&m_timer_led_id, APP_TIMER_MODE_REPEATED, timer_led_handler);
     APP_ERROR_CHECK(err_code);
+#endif
 }
 
 
@@ -730,22 +739,30 @@ static void conn_params_init(void)
  */
 static void application_timers_start(void)
 {
-    /* YOUR_JOB: Start your timers. below is an example of how to start a timer. */
-        ret_code_t err_code;
-        err_code = app_timer_start(m_timer_accel_update_id, TIMER_INTERVAL_ACCEL_UPDATE, NULL);
-        APP_ERROR_CHECK(err_code);
+    ret_code_t err_code;
+    err_code = app_timer_start(m_timer_accel_update_id, TIMER_INTERVAL_ACCEL_UPDATE, NULL);
+    APP_ERROR_CHECK(err_code);
+}
 
+/**@brief Function for starting fast timers.
+ */
+static void application_fast_timers_start(void)
+{
+    ret_code_t err_code;
+    err_code = app_timer_start(m_timer_fast_update_id, TIMER_INTERVAL_FAST_UPDATE, NULL);
+    APP_ERROR_CHECK(err_code);
 }
 
 /**@brief Function for starting LED timer.
  */
 static void led_timers_start(void)
 {
+#ifndef POWERUP
     /* YOUR_JOB: Start your timers. below is an example of how to start a timer. */
-        ret_code_t err_code;
-        err_code = app_timer_start(m_timer_led_id, TIMER_INTERVAL_LED_FLASH, NULL);
-        APP_ERROR_CHECK(err_code);
-
+    ret_code_t err_code;
+    err_code = app_timer_start(m_timer_led_id, TIMER_INTERVAL_LED_FLASH, NULL);
+    APP_ERROR_CHECK(err_code);
+#endif
 }
 
 /**@brief Function for stopping timers.
@@ -753,19 +770,31 @@ static void led_timers_start(void)
 static void application_timers_stop(void)
 {
     /* YOUR_JOB: Stop your timers. below is an example of how to stop a timer. */
-        ret_code_t err_code;
-        err_code = app_timer_stop(m_timer_accel_update_id);
-        APP_ERROR_CHECK(err_code);
+    ret_code_t err_code;
+    err_code = app_timer_stop(m_timer_accel_update_id);
+    APP_ERROR_CHECK(err_code);
+}
+
+/**@brief Function for stopping timers.
+ */
+static void application_fast_timers_stop(void)
+{
+    /* YOUR_JOB: Stop your timers. below is an example of how to stop a timer. */
+    ret_code_t err_code;
+    err_code = app_timer_stop(m_timer_fast_update_id);
+    APP_ERROR_CHECK(err_code);
 }
 
 /**@brief Function for stopping timers.
  */
 static void led_timers_stop(void)
 {
+#ifndef POWERUP
     /* YOUR_JOB: Stop your timers. below is an example of how to stop a timer. */
-        ret_code_t err_code;
-        err_code = app_timer_stop(m_timer_led_id);
-        APP_ERROR_CHECK(err_code);
+    ret_code_t err_code;
+    err_code = app_timer_stop(m_timer_led_id);
+    APP_ERROR_CHECK(err_code);
+#endif
 }
 
 /**@brief Function for putting the chip into sleep mode.
@@ -783,7 +812,9 @@ static void sleep_mode_enter(void)
 
     // Stop all timers, no matter
     application_timers_stop();
+    application_fast_timers_stop();
     led_timers_stop();
+    app_timer_stop_all();
     // Prepare wakeup buttons.
     err_code = bsp_btn_ble_sleep_mode_prepare();
     APP_ERROR_CHECK(err_code);
@@ -835,7 +866,7 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
         case BLE_ADV_EVT_IDLE:
             //---NRF_LOG_DEBUG("Advertising Event Idle."); //---NRF_LOG_FLUSH();
             // sleep_mode_enter();  // do not sleep when fast advertise is done (180s)
-            err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
+            err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_SLOW);
             APP_ERROR_CHECK(err_code);
             m_isAdvertising = true;
             // Refresh LED immediately
@@ -883,6 +914,7 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 
     start_accel_update_flag = true;
     application_timers_start();
+    application_fast_timers_start();
     // Optional to re-start advertising if multiple connections (periph_link_cnt < Max allowed)
     // advertising_start();
 }
@@ -894,9 +926,10 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
 
     start_accel_update_flag = false;
     read_counts = 0;
-    application_timers_stop();
     m_conn_handle = BLE_CONN_HANDLE_INVALID;
     m_ble_envsense.conn_handle = BLE_CONN_HANDLE_INVALID;
+    application_timers_stop();
+    application_fast_timers_stop();
 #if (USE_MPU)
     m_mpu.conn_handle = BLE_CONN_HANDLE_INVALID;
     mpu_sleep(true);    // Put MPU to sleep mode
@@ -1156,6 +1189,10 @@ static void advertising_init(void)
     init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
     init.config.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS;
 
+    init.config.ble_adv_slow_enabled  = true;
+    init.config.ble_adv_slow_interval = APP_ADV_SLOW_INTERVAL;
+    init.config.ble_adv_slow_timeout  = 0;
+
     init.evt_handler = on_adv_evt;
 
     err_code = ble_advertising_init(&m_advertising, &init);
@@ -1390,6 +1427,8 @@ int main(void)
     /** Comment the following if without L4 and L5 on custom board */
 #if defined(BASIC_SENSOR) || defined(SENSORTAG)
     sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
+#else
+    sd_power_dcdc_mode_set(NRF_POWER_DCDC_DISABLE);
 #endif
 
 #if (USE_VEML6075)
@@ -1434,13 +1473,14 @@ int main(void)
     // Start execution.
     NRF_LOG_DEBUG("%s", nrf_log_push("BASIC_SENSOR started."));
     NRF_LOG_FLUSH();
+//    start_accel_update_flag = true;
 
     // Enter main loop.
     for (;;)
     {
         if (NRF_LOG_PROCESS() == false)
         {
-            if(start_accel_update_flag == true)
+            if(start_accel_update_flag)
             {
 #if (USE_MPU)
                 mpu_read_accel(&accel_values);
@@ -1497,15 +1537,15 @@ int main(void)
                 //---NRF_LOG_INFO("Temperature: %05d\n", m_temp_value);
                 //---NRF_LOG_INFO("Accel: %02x, %02x, %02x, %02x, %02x, %02x\r\n", (uint8_t)(accel_values.x >> 8), (uint8_t)accel_values.x, (uint8_t)(accel_values.y >> 8), (uint8_t)accel_values.y, (uint8_t)(accel_values.z >> 8), (uint8_t)accel_values.z);
                 //---NRF_LOG_FLUSH();
-                if (read_counts > READS_UNTIL_UPDATE) ble_mpu_update(&m_mpu, &accel_values);
+                if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_mpu_update(&m_mpu, &accel_values);
 #endif
 #if (USE_BMP280) && (USE_VEML6075)
                 if (veml6075_read && bmp280_read) {
                     veml6075_read = false;
                     bmp280_read = false;
-                    start_accel_update_flag = false;
-                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
-                    if (read_counts > READS_UNTIL_UPDATE) ble_veml6075_update(&m_ble_envsense, &m_ambient);
+                    all_read = true;
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_veml6075_update(&m_ble_envsense, &m_ambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
                         NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
                     }
@@ -1518,9 +1558,9 @@ int main(void)
                 if (ap3216c_read && bmp280_read) {
                     ap3216c_read = false;
                     bmp280_read = false;
-                    start_accel_update_flag = false;
-                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
-                    if (read_counts > READS_UNTIL_UPDATE) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
+                    all_read = true;
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
                         NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
                     }
@@ -1531,17 +1571,17 @@ int main(void)
 #elif (USE_BMP280)
                 if (bmp280_read) {
                     bmp280_read = false;
-                    start_accel_update_flag = false;
-                    if (read_counts > READS_UNTIL_UPDATE) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                    all_read = true;
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                        NRF_LOG_INFO("[%d],%03d Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, read_counts, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
                     }
                 }
 #elif (USE_VEML6075)
                 if (veml6075_read) {
                     veml6075_read = false;
-                    start_accel_update_flag = false;
-                    if (read_counts > READS_UNTIL_UPDATE) ble_veml6075_update(&m_ble_envsense, &m_ambient);
+                    all_read = true;
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_veml6075_update(&m_ble_envsense, &m_ambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
                         NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
                         NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
@@ -1550,8 +1590,8 @@ int main(void)
 #elif (USE_AP3216C)
                 if (ap3216c_read) {
                     ap3216c_read = false;
-                    start_accel_update_flag = false;
-                    if (read_counts > READS_UNTIL_UPDATE) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
+                    all_read = true;
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
                         NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
                     }
@@ -1559,8 +1599,8 @@ int main(void)
 #elif (USE_LTR329)
                 if (ltr329_read) {
                     ltr329_read = false;
-                    start_accel_update_flag = false;
-                    if (read_counts > READS_UNTIL_UPDATE) ble_ltr329_update(&m_ble_envsense, &m_ltr329ambient);
+                    all_read = true;
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ltr329_update(&m_ble_envsense, &m_ltr329ambient);
                     if (read_counts > READS_UNTIL_UPDATE) {
                         NRF_LOG_INFO("LTR329 Ambient: Lux %d, Vis %d, IR %d", m_ltr329ambient.ambient_lux_value, m_ltr329ambient.ambient_visible_value, m_ltr329ambient.ambient_ir_value);
                     }
@@ -1568,12 +1608,20 @@ int main(void)
 #endif
 
                 //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
+                if (all_read) {
+                    all_read = false;
+                    read_counts++;
+                }
+                if (read_counts > READS_UNTIL_UPDATE)
+                    application_fast_timers_stop();
+
 #ifdef AUTO_DISCONNECT
                 if (MAX_READS > 0) {    // Auto-disconnect enabled
                     ret_code_t err_code;
-                    if (!start_accel_update_flag) read_counts++;
+//                    if (!start_accel_update_flag) read_counts++;
                     if (read_counts > MAX_READS) {
                         read_counts = 0;
+                        start_accel_update_flag = false;
                         NRF_LOG_INFO("Enough sensor reads, disconnecting"); NRF_LOG_FLUSH();
                         if (m_ble_envsense.conn_handle != BLE_CONN_HANDLE_INVALID) {
 
@@ -1581,11 +1629,10 @@ int main(void)
                             APP_ERROR_CHECK(err_code);
                         }
                     }
-                } else {
-                    read_counts = READS_UNTIL_UPDATE+1;
                 }
 #else
-                read_counts = READS_UNTIL_UPDATE+1;
+                if (read_counts > READS_UNTIL_UPDATE)
+                    read_counts = READS_UNTIL_UPDATE+1;
 #endif
             } else {
 #if (USE_AP3216C)
@@ -1601,6 +1648,7 @@ int main(void)
                 ltr329_read = false;
 #endif
             }
+            start_accel_update_flag = false;
             nrf_pwr_mgmt_run();
         }
     }
