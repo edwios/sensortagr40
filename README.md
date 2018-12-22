@@ -1,6 +1,6 @@
 # SensorTag R40 and Basic Sensor
 Firmware for the new SensorTag R40 and Basic Sensor from Infor-link.
-2018-06-08: Adopted to SDK15.0
+2018-12-22: Adopted to SDK15.2
 
 Both boards are based on nRF52832 and has 1 RGB LED. The Basic Sensor has two buttons and one BME280 THP sensor. The SensorTag R40 has one button and 3 sensors (BMP280, BMI160, AP3216C) as well as on-board flash.
 
@@ -30,6 +30,8 @@ _NRF_SDH_BLE_VS_UUID_COUNT_ is very important. It *MUST* match the VS UUID count
 
 ## Board variations
 
+Support boards: BASIC_SENSOR, SENSORTAG, SENSORTAG_R40
+
 ### Basic Sensor
 make BOARD=BASIC_SENSOR
 Or define by adding CFLAGS += -DBASIC_SENSOR in Makefile
@@ -38,9 +40,10 @@ Or define by adding CFLAGS += -DBASIC_SENSOR in Makefile
 make BOARD=SENSORTAG_R40
 Or define by adding CFLAGS += -DSENSORTAG_R40 in Makefile
 
-### AC Powered
-Define by adding CFLASG += -DPOWERUP in Makefile
-
+### Battery Powered
+Default is BATTERY=1
+To use AC power,
+```make BATTERY=0```
 
 ##Other board variations
 
@@ -58,7 +61,7 @@ Change `USE_VME6075` to 0
 
 ## Compile and flash
 ```cd pca10040/s132/armgcc
-make [BOARD=...] [SENSOR=...]
+make [BOARD=...] [SENSOR=...] [BATTERY=0]
 nrfjprog --recover
 make flash_softdevice
 make flash
