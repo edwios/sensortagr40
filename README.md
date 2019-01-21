@@ -48,7 +48,7 @@ To use AC power,
 ##Other board variations
 
 ### Board with external VEML6075 UV sensor
-make SENSOR=VME6075
+make SENSOR=VEML6075
 Or, in main.c
 Change `USE_VME6075` to 1
 Change `USE_AP3216C` to 0

@@ -166,9 +166,9 @@
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(400, UNIT_1_25_MS)       /**< Maximum acceptable connection interval (0.2 second). */
-#define SLAVE_LATENCY                   2                                       /**< Slave latency. */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (20m seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(40, UNIT_1_25_MS)       /**< Maximum acceptable connection interval (40m second). */
+#define SLAVE_LATENCY                   4                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
 
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
@@ -224,6 +224,7 @@ static bool m_isAdvertising = false;
 static ble_envsense_t m_ble_envsense;
 static uint8_t read_counts = 0;
 static bool all_read = false;
+static int8_t tx_power_level = 4;
 
 #if (USE_MPU)
 ble_mpu_t m_mpu;
@@ -890,6 +891,12 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
     err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
     APP_ERROR_CHECK(err_code);
     m_isAdvertising = false;
+
+#ifndef POWERUP
+    // NORDIC: SET HIGH TX POWER AFTER CONNECTING if not running on battery
+    err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, tx_power_level); 
+    APP_ERROR_CHECK(err_code); 
+#endif
     // Refresh LED immediately
     timer_led_handler(0);
 #if (USE_MPU)
@@ -1184,6 +1191,7 @@ static void advertising_init(void)
     init.advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
     init.advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
     init.advdata.uuids_complete.p_uuids  = m_adv_uuids;
+    init.advdata.p_tx_power_level        = &tx_power_level;
 
     init.config.ble_adv_fast_enabled  = true;
     init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
@@ -1378,8 +1386,8 @@ void mpu_setup(void)
  */
 int main(void)
 {
-
     bool erase_bonds;
+
 #if (USE_VEML6075)
     uint8_t veml6057_partid=0;
     bool veml6075_read=false;
@@ -1423,6 +1431,12 @@ int main(void)
     services_init();
     conn_params_init();
     peer_manager_init();
+
+#ifndef POWERUP
+    // NORDIC: SET HIGH TX POWER ADV if not runnipng on battery
+    uint32_t err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_advertising.adv_handle, tx_power_level); 
+    APP_ERROR_CHECK(err_code); 
+#endif
 
     /** Comment the following if without L4 and L5 on custom board */
 #if defined(BASIC_SENSOR) || defined(SENSORTAG)
