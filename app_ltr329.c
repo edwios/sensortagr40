@@ -81,26 +81,56 @@ uint32_t ltr329_read_ambient(ltr329_ambient_values_t * ltr329_ambient_values)
     uint32_t err_code;
     uint8_t visible_values[2];
     uint8_t ir_values[2];
-    uint16_t t;
-    uint32_t ratio;
-    uint32_t l=0;
-
-    err_code = nrf_drv_ltr329_read_registers(ALS_DATA_CH1, visible_values, 2);
-    if(err_code != NRF_SUCCESS) return err_code;
-
-    uint16_t visible = (visible_values[1] << 8) + visible_values[0];
-
-    err_code = nrf_drv_ltr329_read_registers(ALS_DATA_CH0, ir_values, 2);
+ 
+    // Must read CH1 (IR) first according to data sheet
+    err_code = nrf_drv_ltr329_read_registers(ALS_DATA_CH1, ir_values, 2);
     if(err_code != NRF_SUCCESS) return err_code;
 
     uint16_t ir = (ir_values[1] << 8) + ir_values[0];
 
+    err_code = nrf_drv_ltr329_read_registers(ALS_DATA_CH0, visible_values, 2);
+    if(err_code != NRF_SUCCESS) return err_code;
+
+    uint16_t visible = (visible_values[1] << 8) + visible_values[0];
+
     ltr329_ambient_values->ambient_visible_value = visible;
     ltr329_ambient_values->ambient_ir_value = ir;
 
-    t = ir + visible;
+    /*
+     * New method used in pySense
+     * https://nsrc.org/workshops/2018/apricot-iot/src/pysense/ambient-light/main.py
+     *
+     */
+
+    /*
+    float ratio;
+    float lux=0.0;
+
+    if (!((ir == 0xffff) || (visible == 0xffff)) && (visible > 0)) {  // satuated
+        ratio = (float)ir / (float)visible;
+        float d0 = visible * 4.02 * 16.0;
+        float d1 = ir * 4.02 * 16.0;
+        if (ratio < 0.5)
+            lux = 0.0304 * d0 - 0.062 * d0 * pow(ratio,1.4);
+        else if (ratio < 0.61)
+            lux = 0.0224 * d0 - 0.031 * d1;
+        else if (ratio < 0.80)
+            lux = 0.0128 * d0 - 0.0153 * d1;
+        else if (ratio < 1.30)
+            lux = 0.00146 * d0 - 0.00112 * d1;
+        else
+            lux = 0.0;
+    }
+    ltr329_ambient_values->ambient_lux_value = (uint16_t)round(lux);
+    */
+
+    /*
+     * Old method
+    */
+    uint32_t l = 0;
+    uint32_t t = ir + visible;
     if (t > 0) {
-        ratio = (visible * 1000) / t;
+        uint32_t ratio = (visible * 1000) / t;
         if(ratio < 450) {
             l = (ir * 17743 + visible * 11059);
         } else if (ratio < 640 && ratio >= 450) {
@@ -112,7 +142,7 @@ uint32_t ltr329_read_ambient(ltr329_ambient_values_t * ltr329_ambient_values)
     } else {
         ltr329_ambient_values->ambient_lux_value = 0;
     }
-
+    
     return NRF_SUCCESS;
 }
 
