@@ -45,6 +45,18 @@
  * @retval      uint32_t        Error code
  */
 uint32_t nrf_drv_bmp280_init(void);
+
+/**@brief Function to start TWI drivers
+ *
+ * @retval      uint32_t        Error code
+ */
+uint32_t nrf_drv_bmp280_start(void);
+
+/**@brief Function to stop TWI drivers
+ *
+ * @retval      uint32_t        Error code
+ */
+uint32_t nrf_drv_bmp280_stop(void);
 	
 
 /**@brief Function for reading an arbitrary register

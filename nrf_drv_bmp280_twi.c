@@ -64,6 +64,18 @@ static void nrf_drv_bmp280_twi_event_handler(nrf_drv_twi_evt_t const * p_event, 
 uint32_t nrf_drv_bmp280_init(void)
 {
     uint32_t err_code;
+
+    err_code = nrf_drv_bmp280_stop();
+    if(err_code != NRF_SUCCESS) return err_code;
+    err_code = nrf_drv_bmp280_start();
+    if(err_code != NRF_SUCCESS) return err_code;
+
+    return NRF_SUCCESS;
+}
+
+uint32_t nrf_drv_bmp280_start(void)
+{
+    uint32_t err_code;
     
     const nrf_drv_twi_config_t twi_bmp280_config = {
        .scl                = BMP280_TWI_SCL_PIN,
@@ -83,6 +95,17 @@ uint32_t nrf_drv_bmp280_init(void)
     nrf_drv_twi_enable(&m_twi_instance);
 	
 	return NRF_SUCCESS;
+}
+
+uint32_t nrf_drv_bmp280_stop(void)
+{
+    nrf_drv_twi_uninit(&m_twi_instance);
+    *(volatile uint32_t *)0x40003FFC = 0;
+    *(volatile uint32_t *)0x40003FFC;
+    *(volatile uint32_t *)0x40003FFC = 1;
+
+    return NRF_SUCCESS;
+
 }
 
 #if defined(BASIC_SENSOR)
