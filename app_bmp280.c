@@ -85,9 +85,9 @@ uint32_t bma255_config_deactivate(void)
 {
     uint32_t err_code;
     
-    // Configure BMA255 to suspend mode (1uA) as Normal mode will consume 100uA
+    // Configure BMA255 to deep suspend mode (1uA) as Normal mode will consume 100uA
     NRF_LOG_DEBUG("Suspending BMA255"); NRF_LOG_FLUSH();
-    err_code = nrf_drv_bma255_write_single_register(BMA255_PMU_LPW, 0x9E);
+    err_code = nrf_drv_bma255_write_single_register(BMA255_PMU_LPW, 0x3E);
     if(err_code != NRF_SUCCESS) return err_code;
     return NRF_SUCCESS;
 }
@@ -103,10 +103,17 @@ uint32_t bmp280_init(void)
 	err_code = nrf_drv_bmp280_init();
     if(err_code != NRF_SUCCESS) return err_code;
 
-    err_code = nrf_drv_bmp280_read_registers(BMP280_REGISTER_CHIPID, &chipid, 1);
+#if defined(BASIC_SENSOR)
+    err_code = bma255_read_partid(&chipid);
+    if(err_code != NRF_SUCCESS) return err_code;
+    if (chipid != BMA255_CHIPID) {
+        NRF_LOG_DEBUG("BMP280_Init error: BMA255 not found!"); NRF_LOG_FLUSH();
+    }
+#endif
+    err_code = bmp280_read_partid(&chipid);
     if(err_code != NRF_SUCCESS) return err_code;
     if (chipid != BMP280_CHIPID) {
-        //---NRF_LOG_DEBUG("Init error: BMP280 not found!"); //---NRF_LOG_FLUSH();
+        NRF_LOG_DEBUG("BMP280_Init error: BMP280 not found!"); NRF_LOG_FLUSH();
     }
     return NRF_SUCCESS;
 }
@@ -297,6 +304,8 @@ uint32_t bmp280_config_activate(void)
 {
     uint32_t err_code;
 
+    err_code = nrf_drv_bmp280_init();
+    if(err_code != NRF_SUCCESS) return err_code;
     err_code = nrf_drv_bmp280_write_single_register(BMP280_REGISTER_CONTROL, 0x6F);
     if(err_code != NRF_SUCCESS) return err_code;
     return NRF_SUCCESS;
@@ -307,6 +316,9 @@ uint32_t bmp280_config_deactivate(void)
     uint32_t err_code;
 
     err_code = nrf_drv_bmp280_write_single_register(BMP280_REGISTER_CONTROL, 0x6C);
+    if(err_code != NRF_SUCCESS) return err_code;
+
+    err_code = nrf_drv_bmp280_stop();
     if(err_code != NRF_SUCCESS) return err_code;
 
     return NRF_SUCCESS;
