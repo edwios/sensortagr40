@@ -158,16 +158,16 @@
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
-#define APP_ADV_INTERVAL                32                                      /**< The advertising interval (in units of 0.625 ms. This value corresponds to 20 s). */
-#define APP_ADV_SLOW_INTERVAL           1636                                    /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1022.5 ms). */
-#define APP_ADV_TIMEOUT_IN_SECONDS      BLE_GAP_ADV_TIMEOUT_LIMITED_MAX       /**< The advertising timeout in units of seconds. */
-//#define APP_ADV_TIMEOUT_IN_SECONDS      0                                       /**< The advertising timeout in units of seconds. */
+#define APP_ADV_INTERVAL                MSEC_TO_UNITS(20, UNIT_0_625_MS)        /**< The advertising interval (in units of 0.625 ms. This value corresponds to 20 ms). */
+#define APP_ADV_SLOW_INTERVAL           MSEC_TO_UNITS(1022.5, UNIT_0_625_MS)    /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1022.5 ms). */
+//#define APP_ADV_TIMEOUT_IN_SECONDS      BLE_GAP_ADV_TIMEOUT_LIMITED_MAX       /**< The advertising timeout in units of seconds. */
+#define APP_ADV_TIMEOUT_IN_SECONDS      1                                       /**< The advertising timeout in units of seconds. */
 
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (20m seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(40, UNIT_1_25_MS)       /**< Maximum acceptable connection interval (40m second). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)         /**< Minimum acceptable connection interval (20m seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(40, UNIT_1_25_MS)         /**< Maximum acceptable connection interval (40m second). */
 #define SLAVE_LATENCY                   4                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
 
@@ -185,7 +185,7 @@
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
 #define TEMP_TYPE_AS_CHARACTERISTIC     1                                       /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
-#define MAX_READS                       30                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
+#define MAX_READS                       30                                      /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
 //#define MAX_READS                       0                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
 #define READS_UNTIL_UPDATE              5                                       /**< Update to GATT until after 4 reads */
 
@@ -200,7 +200,7 @@
 #define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(1000)                   // 1000 ms intervals
 #define TIMER_INTERVAL_FAST_UPDATE      APP_TIMER_TICKS(200)                    // 200ms fast interval update
 #define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(5000)                   // 1000 ms intervals
-#define LED_BLINK_INTERVAL              1                                       // LED blinks 20ms
+#define LED_BLINK_INTERVAL              1                                       // LED blink duration in ms (1 ms)
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
@@ -214,7 +214,6 @@ NRF_BLE_QWR_DEF(m_qwr);                                                         
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 BLE_ADVERTISING_DEF(m_advertising);                                             /**< Advertising module instance. */
 APP_TIMER_DEF(m_timer_accel_update_id);
-APP_TIMER_DEF(m_timer_fast_update_id);
 #ifndef POWERUP
 APP_TIMER_DEF(m_timer_led_id);
 #endif
@@ -224,7 +223,11 @@ static bool m_isAdvertising = false;
 static ble_envsense_t m_ble_envsense;
 static uint8_t read_counts = 0;
 static bool all_read = false;
+#ifdef POWERUP
+static int8_t tx_power_level = 0;
+#else
 static int8_t tx_power_level = 4;
+#endif
 
 #if (USE_MPU)
 ble_mpu_t m_mpu;
@@ -244,6 +247,7 @@ ltr329_ambient_values_t m_ltr329ambient;
 #endif
 
 bool start_accel_update_flag = false;
+bool fastRead = true;
 
 /* YOUR_JOB: Declare all services structure your application is using
  *  BLE_XYZ_DEF(m_xyz);
@@ -467,15 +471,9 @@ static void timers_init(void)
 
     // Create timers.
 
-    /* YOUR_JOB: Create any timers to be used by the application.
-                 Below is an example of how to create a timer.
-                 For every new timer needed, increase the value of the macro APP_TIMER_MAX_TIMERS by
-                 one.
-    */
     err_code = app_timer_create(&m_timer_accel_update_id, APP_TIMER_MODE_REPEATED, timer_accel_update_handler);
     APP_ERROR_CHECK(err_code);
-    err_code = app_timer_create(&m_timer_fast_update_id, APP_TIMER_MODE_REPEATED, timer_accel_update_handler);
-    APP_ERROR_CHECK(err_code);
+
 #ifndef POWERUP
     err_code = app_timer_create(&m_timer_led_id, APP_TIMER_MODE_REPEATED, timer_led_handler);
     APP_ERROR_CHECK(err_code);
@@ -741,16 +739,7 @@ static void conn_params_init(void)
 static void application_timers_start(void)
 {
     ret_code_t err_code;
-    err_code = app_timer_start(m_timer_accel_update_id, TIMER_INTERVAL_ACCEL_UPDATE, NULL);
-    APP_ERROR_CHECK(err_code);
-}
-
-/**@brief Function for starting fast timers.
- */
-static void application_fast_timers_start(void)
-{
-    ret_code_t err_code;
-    err_code = app_timer_start(m_timer_fast_update_id, TIMER_INTERVAL_FAST_UPDATE, NULL);
+    err_code = app_timer_start(m_timer_accel_update_id, TIMER_INTERVAL_FAST_UPDATE, NULL);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -774,16 +763,7 @@ static void application_timers_stop(void)
     ret_code_t err_code;
     err_code = app_timer_stop(m_timer_accel_update_id);
     APP_ERROR_CHECK(err_code);
-}
-
-/**@brief Function for stopping timers.
- */
-static void application_fast_timers_stop(void)
-{
-    /* YOUR_JOB: Stop your timers. below is an example of how to stop a timer. */
-    ret_code_t err_code;
-    err_code = app_timer_stop(m_timer_fast_update_id);
-    APP_ERROR_CHECK(err_code);
+    NRF_TIMER1->TASKS_SHUTDOWN = 1;
 }
 
 /**@brief Function for stopping timers.
@@ -813,7 +793,6 @@ static void sleep_mode_enter(void)
 
     // Stop all timers, no matter
     application_timers_stop();
-    application_fast_timers_stop();
     led_timers_stop();
     app_timer_stop_all();
     // Prepare wakeup buttons.
@@ -888,6 +867,11 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 
     m_conn_handle = p_gap_evt->conn_handle;
     m_ble_envsense.conn_handle = p_gap_evt->conn_handle; 
+#ifndef POWERUP
+    // NORDIC: SET HIGH TX POWER ADV if not runnipng on battery
+    uint32_t err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_ble_envsense.conn_handle, tx_power_level); 
+    APP_ERROR_CHECK(err_code); 
+#endif
     err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
     APP_ERROR_CHECK(err_code);
     m_isAdvertising = false;
@@ -920,8 +904,8 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 #endif
 
     start_accel_update_flag = true;
+    fastRead = true;
     application_timers_start();
-    application_fast_timers_start();
     // Optional to re-start advertising if multiple connections (periph_link_cnt < Max allowed)
     // advertising_start();
 }
@@ -936,7 +920,7 @@ static void on_disconnected(ble_gap_evt_t const * const p_gap_evt)
     m_conn_handle = BLE_CONN_HANDLE_INVALID;
     m_ble_envsense.conn_handle = BLE_CONN_HANDLE_INVALID;
     application_timers_stop();
-    application_fast_timers_stop();
+
 #if (USE_MPU)
     m_mpu.conn_handle = BLE_CONN_HANDLE_INVALID;
     mpu_sleep(true);    // Put MPU to sleep mode
@@ -1220,7 +1204,9 @@ static void buttons_leds_init(bool * p_erase_bonds)
     bsp_event_t startup_event;
 
     //---NRF_LOG_DEBUG("Initialising bsp"); //---NRF_LOG_FLUSH();
-    err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
+//    err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
+    // Disable buttons if not used
+    err_code = bsp_init(BSP_INIT_LEDS, bsp_event_handler);
     APP_ERROR_CHECK(err_code);
 
     err_code = bsp_btn_ble_init(NULL, &startup_event);
@@ -1387,6 +1373,9 @@ void mpu_setup(void)
 int main(void)
 {
     bool erase_bonds;
+    uint8_t err_code;
+    bool error = false;
+    int fastReadCount = 0;
 
 #if (USE_VEML6075)
     uint8_t veml6057_partid=0;
@@ -1448,27 +1437,49 @@ int main(void)
 #if (USE_VEML6075)
     veml6075_poweron();
     nrf_delay_us(300000);
-    veml6075_init();
-    veml6075_config();
-    veml6075_config_deactivate();
+    err_code = veml6075_init();
+    if (err_code == NRF_SUCCESS)
+    {
+        veml6075_config();
+        veml6075_config_deactivate();
+    } else {
+        error = true;
+    }
 #endif
 #if (USE_BMP280)
-    bmp280_init();
-    bmp280_config();
-    bmp280_config_deactivate();
+    err_code = bmp280_init();
+    if (err_code == NRF_SUCCESS)
+    {
+        bmp280_config();
 #if defined(BASIC_SENSOR)
-    bma255_config_deactivate();
+        // Disable the MPU on board
+        // Must done before bmp280_config_deactivate otherwise TWI will be disabled too early
+        bma255_config_deactivate();
 #endif
+        bmp280_config_deactivate(); // bmp280_config_deactivate() will also stop TWI
+    } else {
+        error = true;
+    }
 #endif
 #if (USE_AP3216C)
-    ap3216c_init();
-    ap3216c_config();
-    ap3216c_config_deactivate();
+    err_code = ap3216c_init();
+    if (err_code == NRF_SUCCESS)
+    {
+        ap3216c_config();
+        ap3216c_config_deactivate();
+    } else {
+        error = true;
+    }
 #endif
 #if (USE_LTR329)
-    ltr329_init();
-    ltr329_config();
-    ltr329_config_deactivate();
+    err_code = ltr329_init();
+    if (err_code == NRF_SUCCESS)
+    {
+        ltr329_config();
+        ltr329_config_deactivate();
+    } else {
+        error = true;
+    }
 #endif
 #if (USE_MPU)
     accel_values_t accel_values, last_accel_values;
@@ -1482,13 +1493,14 @@ int main(void)
 //    nrf_gpio_cfg_sense_input(BUTTON1, NRF_GPIO_PIN_PULLUP, NRF_GPIO_PIN_SENSE_LOW);
     led_timers_start();
     advertising_start(erase_bonds);
-    bsp_indication_set(BSP_INDICATE_IDLE);
+    if (!error) bsp_indication_set(BSP_INDICATE_IDLE);
 
     // Start execution.
     NRF_LOG_DEBUG("%s", nrf_log_push("BASIC_SENSOR started."));
     NRF_LOG_FLUSH();
 //    start_accel_update_flag = true;
 
+    fastReadCount = 0;
     // Enter main loop.
     for (;;)
     {
@@ -1496,173 +1508,182 @@ int main(void)
         {
             if(start_accel_update_flag)
             {
+                if (fastRead || fastReadCount == 5)
+                {
 #if (USE_MPU)
-                mpu_read_accel(&accel_values);
-                mpu_read_gyro(&gyro_values);
-                mpu_read_temp(&m_temp_value);
+                    mpu_read_accel(&accel_values);
+                    mpu_read_gyro(&gyro_values);
+                    mpu_read_temp(&m_temp_value);
 #endif
 #if (USE_VEML6075)
-                if (veml6075_has_new_data()) {
-                    veml6075_read_partid(&veml6057_partid);
-                    veml6075_read_ambient(&m_ambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_DEBUG("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
-                        NRF_LOG_DEBUG("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                    if (veml6075_has_new_data()) {
+                        veml6075_read_partid(&veml6057_partid);
+                        veml6075_read_ambient(&m_ambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_DEBUG("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
+                            NRF_LOG_DEBUG("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                        }
+                        veml6075_read = true;
                     }
-                    veml6075_read = true;
-                }
 #endif
 #if (USE_AP3216C)
-                if (ap3216c_has_new_data()) {
-                    ap3216c_read_ambient(&m_ap3216cambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_DEBUG("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                    if (ap3216c_has_new_data()) {
+                        ap3216c_read_ambient(&m_ap3216cambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_DEBUG("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                        }
+                        ap3216c_read = true;
                     }
-                    ap3216c_read = true;
-                }
 #endif
 #if (USE_BMP280)
-                if (bmp280_has_new_data()) {
-                    bmp280_read_partid(&bmp280_partid);
-                    bmp280_read_ambient(&m_bmpambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_DEBUG("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                    if (bmp280_has_new_data()) {
+                        bmp280_read_partid(&bmp280_partid);
+                        bmp280_read_ambient(&m_bmpambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_DEBUG("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                        }
+                        bmp280_read = true;
                     }
-                    bmp280_read = true;
-                }
+                
+                    
 #endif
 #if (USE_LTR329)
-                if (ltr329_has_new_data()) {
-                    ltr329_read_partid(&ltr329_partid);
-                    ltr329_read_ambient(&m_ltr329ambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_DEBUG("LTR329 Ambient: Lux %d, Vis %d, IR %d", m_ltr329ambient.ambient_lux_value, m_ltr329ambient.ambient_visible_value, m_ltr329ambient.ambient_ir_value);
+                    if (ltr329_has_new_data()) {
+                        ltr329_read_partid(&ltr329_partid);
+                        ltr329_read_ambient(&m_ltr329ambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_DEBUG("LTR329 Ambient: Lux %d, Vis %d, IR %d", m_ltr329ambient.ambient_lux_value, m_ltr329ambient.ambient_visible_value, m_ltr329ambient.ambient_ir_value);
+                        }
+                        ltr329_read = true;
                     }
-                    ltr329_read = true;
-                }
 #endif
 #if (USE_MPU)
-                delta_accel = ((accel_values.x-last_accel_values.x)*(accel_values.x-last_accel_values.x))+((accel_values.y-last_accel_values.y)*(accel_values.y-last_accel_values.y))+((accel_values.z-last_accel_values.z)*(accel_values.z-last_accel_values.z));
-                last_accel_values = accel_values;
-                //---NRF_LOG_INFO("\033[2J\033[;HAccel: %05d, %05d, %05d\r\n", accel_values.x, accel_values.y, accel_values.z);
-                //---NRF_LOG_INFO("Accel: %05d, %05d, %05d", accel_values.x, accel_values.y, accel_values.z);
-                //---NRF_LOG_INFO("Delta: %d", delta_accel); 
-                //---NRF_LOG_INFO("Gyro: %05d, %05d, %05d", gyro_values.x, gyro_values.y, gyro_values.z);
-                //---NRF_LOG_INFO("Temperature: %05d\n", m_temp_value);
-                //---NRF_LOG_INFO("Accel: %02x, %02x, %02x, %02x, %02x, %02x\r\n", (uint8_t)(accel_values.x >> 8), (uint8_t)accel_values.x, (uint8_t)(accel_values.y >> 8), (uint8_t)accel_values.y, (uint8_t)(accel_values.z >> 8), (uint8_t)accel_values.z);
-                //---NRF_LOG_FLUSH();
-                if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_mpu_update(&m_mpu, &accel_values);
+                    delta_accel = ((accel_values.x-last_accel_values.x)*(accel_values.x-last_accel_values.x))+((accel_values.y-last_accel_values.y)*(accel_values.y-last_accel_values.y))+((accel_values.z-last_accel_values.z)*(accel_values.z-last_accel_values.z));
+                    last_accel_values = accel_values;
+                    //---NRF_LOG_INFO("\033[2J\033[;HAccel: %05d, %05d, %05d\r\n", accel_values.x, accel_values.y, accel_values.z);
+                    //---NRF_LOG_INFO("Accel: %05d, %05d, %05d", accel_values.x, accel_values.y, accel_values.z);
+                    //---NRF_LOG_INFO("Delta: %d", delta_accel); 
+                    //---NRF_LOG_INFO("Gyro: %05d, %05d, %05d", gyro_values.x, gyro_values.y, gyro_values.z);
+                    //---NRF_LOG_INFO("Temperature: %05d\n", m_temp_value);
+                    //---NRF_LOG_INFO("Accel: %02x, %02x, %02x, %02x, %02x, %02x\r\n", (uint8_t)(accel_values.x >> 8), (uint8_t)accel_values.x, (uint8_t)(accel_values.y >> 8), (uint8_t)accel_values.y, (uint8_t)(accel_values.z >> 8), (uint8_t)accel_values.z);
+                    //---NRF_LOG_FLUSH();
+                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_mpu_update(&m_mpu, &accel_values);
 #endif
 #if (USE_BMP280) && (USE_VEML6075)
-                if (veml6075_read && bmp280_read) {
-                    veml6075_read = false;
-                    bmp280_read = false;
-                    all_read = true;
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_veml6075_update(&m_ble_envsense, &m_ambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
-                    }
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
-                        NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
-                    }
-                }
-#elif (USE_BMP280) && (USE_AP3216C)               
-                if (ap3216c_read && bmp280_read) {
-                    ap3216c_read = false;
-                    bmp280_read = false;
-                    all_read = true;
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
-                    }
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
-                    }
-                }
-#elif (USE_BMP280)
-                if (bmp280_read) {
-                    bmp280_read = false;
-                    all_read = true;
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d],%03d Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, read_counts, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
-                    }
-                }
-#elif (USE_VEML6075)
-                if (veml6075_read) {
-                    veml6075_read = false;
-                    all_read = true;
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_veml6075_update(&m_ble_envsense, &m_ambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
-                        NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
-                    }
-                }
-#elif (USE_AP3216C)
-                if (ap3216c_read) {
-                    ap3216c_read = false;
-                    all_read = true;
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
-                    }
-                }
-#elif (USE_LTR329)
-                if (ltr329_read) {
-                    ltr329_read = false;
-                    all_read = true;
-                    if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ltr329_update(&m_ble_envsense, &m_ltr329ambient);
-                    if (read_counts > READS_UNTIL_UPDATE) {
-                        NRF_LOG_INFO("LTR329 Ambient: Lux %d, Vis %d, IR %d", m_ltr329ambient.ambient_lux_value, m_ltr329ambient.ambient_visible_value, m_ltr329ambient.ambient_ir_value);
-                    }
-                }                
-#endif
-
-                //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
-                if (all_read) {
-                    all_read = false;
-                    read_counts++;
-                }
-                if (read_counts > READS_UNTIL_UPDATE)
-                    application_fast_timers_stop();
-
-#ifdef AUTO_DISCONNECT
-                if (MAX_READS > 0) {    // Auto-disconnect enabled
-                    ret_code_t err_code;
-//                    if (!start_accel_update_flag) read_counts++;
-                    if (read_counts > MAX_READS) {
-                        read_counts = 0;
-                        start_accel_update_flag = false;
-                        NRF_LOG_INFO("Enough sensor reads, disconnecting"); NRF_LOG_FLUSH();
-                        if (m_ble_envsense.conn_handle != BLE_CONN_HANDLE_INVALID) {
-
-                            err_code = sd_ble_gap_disconnect(m_ble_envsense.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-                            APP_ERROR_CHECK(err_code);
+                    if (veml6075_read && bmp280_read) {
+                        veml6075_read = false;
+                        bmp280_read = false;
+                        all_read = true;
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_veml6075_update(&m_ble_envsense, &m_ambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                        }
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
+                            NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
                         }
                     }
-                }
-#else
-                if (read_counts > READS_UNTIL_UPDATE)
-                    read_counts = READS_UNTIL_UPDATE+1;
+#elif (USE_BMP280) && (USE_AP3216C)               
+                    if (ap3216c_read && bmp280_read) {
+                        ap3216c_read = false;
+                        bmp280_read = false;
+                        all_read = true;
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("[%d] Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                        }
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                        }
+                    }
+#elif (USE_BMP280)
+                    if (bmp280_read) {
+                        bmp280_read = false;
+                        all_read = true;
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_bmp280_update(&m_ble_envsense, &m_bmpambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("[%d],%03d Ambient: Temp %d, Humi %d, Pres %d", bmp280_partid, read_counts, m_bmpambient.ambient_temperature_value, m_bmpambient.ambient_humidity_value, m_bmpambient.ambient_pressure_value);
+                        }
+                    }
+#elif (USE_VEML6075)
+                    if (veml6075_read) {
+                        veml6075_read = false;
+                        all_read = true;
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_veml6075_update(&m_ble_envsense, &m_ambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("[%d] Ambient: Vis %d, IR %d, Lux %d", veml6057_partid, m_ambient.ambient_visible_value, m_ambient.ambient_ir_value, m_ambient.ambient_lux_value);
+                            NRF_LOG_INFO("[%d] UV: UVA %d, UVB %d, UVI %d", veml6057_partid, m_ambient.ambient_uva_value, m_ambient.ambient_uvb_value, m_ambient.ambient_uvi_value);
+                        }
+                    }
+#elif (USE_AP3216C)
+                    if (ap3216c_read) {
+                        ap3216c_read = false;
+                        all_read = true;
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ap3216c_update(&m_ble_envsense, &m_ap3216cambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("AP3216c Ambient: Vis %d, IR %d, Lux %d", m_ap3216cambient.ambient_visible_value, m_ap3216cambient.ambient_ir_value, m_ap3216cambient.ambient_lux_value);
+                        }
+                    }
+#elif (USE_LTR329)
+                    if (ltr329_read) {
+                        ltr329_read = false;
+                        all_read = true;
+                        if ((read_counts > READS_UNTIL_UPDATE) && (m_conn_handle != BLE_CONN_HANDLE_INVALID)) ble_ltr329_update(&m_ble_envsense, &m_ltr329ambient);
+                        if (read_counts > READS_UNTIL_UPDATE) {
+                            NRF_LOG_INFO("LTR329 Ambient: Lux %d, Vis %d, IR %d", m_ltr329ambient.ambient_lux_value, m_ltr329ambient.ambient_visible_value, m_ltr329ambient.ambient_ir_value);
+                        }
+                    }                
 #endif
-            } else {
+
+                    //mpu_sleep(true); // Somehow enable this will cause the mpu not reporting readings
+                    if (all_read) {
+                        all_read = false;
+                        read_counts++;
+                    }
+                    if (read_counts > READS_UNTIL_UPDATE)
+                        fastRead = false;
+
+#ifdef AUTO_DISCONNECT
+                    if (MAX_READS > 0) {    // Auto-disconnect enabled
+                        ret_code_t err_code;
+    //                    if (!start_accel_update_flag) read_counts++;
+                        if (read_counts > MAX_READS) {
+                            read_counts = 0;
+                            start_accel_update_flag = false;
+                            NRF_LOG_INFO("Enough sensor reads, disconnecting"); NRF_LOG_FLUSH();
+                            if (m_ble_envsense.conn_handle != BLE_CONN_HANDLE_INVALID) {
+
+                                err_code = sd_ble_gap_disconnect(m_ble_envsense.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+                                APP_ERROR_CHECK(err_code);
+                            }
+                        }
+                    }
+#else
+                    if (read_counts > READS_UNTIL_UPDATE)
+                        read_counts = READS_UNTIL_UPDATE+1;
+#endif
+                } else {
 #if (USE_AP3216C)
-                ap3216c_read = false;
+                    ap3216c_read = false;
 #endif
 #if (USE_VEML6075)
-                veml6075_read = false;
+                    veml6075_read = false;
 #endif
 #if (USE_BMP280)
-                bmp280_read = false;
+                    bmp280_read = false;
 #endif
 #if (USE_LTR329)
-                ltr329_read = false;
+                    ltr329_read = false;
 #endif
+                }
+                start_accel_update_flag = false;
+                if (fastReadCount++ > 5)
+                {
+                    fastReadCount = 0;
+                }
             }
-            start_accel_update_flag = false;
             nrf_pwr_mgmt_run();
         }
     }
