@@ -4,14 +4,13 @@
 #define BLE_UUID_ENVIRONMENTAL_SENSING_SERVICE     0x181A /**< Environmental Sensing service UUID. */
 
 // EnvMulti
-#if defined (SENSORTAG_R40)
-#if defined(VEML6075)
+#if defined (SENSORTAG_R40) && defined(VEML6075)
 // EnvMultiUV
 #define BLE_UUID_BASE_UUID                {0x3D, 0x72, 0x1B, 0xF8, 0x6F, 0x56, 0x66, 0x1E, 0x9B, 0x6B, 0x79, 0x06, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
-#else
+#endif
+#if defined (SENSORTAG_R40) && !defined(VEML6075)
 // EnvMultiIR
 #define BLE_UUID_BASE_UUID                {0x2D, 0x72, 0x8B, 0x84, 0x64, 0x56, 0x2D, 0x15, 0x7F, 0x00, 0x91, 0x06, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
-#endif
 #endif
 
 #if defined(SENSORTAG)
