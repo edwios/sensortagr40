@@ -154,7 +154,7 @@
 #define DEVICE_NAME                     "BLE_GeNErIC"
 #endif
 #define MANUFACTURER_NAME               "ioStation Ltd."                        /**< Manufacturer. Will be passed to Device Information Service. */
-#define MODEL_NUM                       "HYP-AT1A05"                            /**< Model number. Will be passed to Device Information Service. */
+#define MODEL_NUM                       "HYP-AT1A06"                            /**< Model number. Will be passed to Device Information Service. */
 #define MANUFACTURER_ID                 0x6c80172535                            /**< Manufacturer ID, part of System ID. Will be passed to Device Information Service. */
 #define ORG_UNIQUE_ID                   0x10001a                                /**< Organizational Unique ID, part of System ID. Will be passed to Device Information Service. */
 
@@ -166,10 +166,10 @@
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)         /**< Minimum acceptable connection interval (20m seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(40, UNIT_1_25_MS)         /**< Maximum acceptable connection interval (40m second). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(25, UNIT_1_25_MS)         /**< Minimum acceptable connection interval (20m seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(2000, UNIT_1_25_MS)         /**< Maximum acceptable connection interval (40m second). */
 #define SLAVE_LATENCY                   4                                       /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
+#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(26000, UNIT_10_MS)        /**< Connection supervisory timeout (10 seconds). */
 
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000)                  /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
@@ -1411,15 +1411,33 @@ int main(void)
 //    uart_init();  NRF_UART0->ENABLE = 1;
     timers_init();
     buttons_leds_init(&erase_bonds);
+    NRF_LOG_INFO("LED done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     power_management_init();
+    NRF_LOG_INFO("PWM done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     bsp_indication_set(BSP_INDICATE_CONNECTED);
+    NRF_LOG_INFO("BSP done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     ble_stack_init();
+    NRF_LOG_INFO("BLE done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     gap_params_init();
+    NRF_LOG_INFO("GAP done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     gatt_init();
+    NRF_LOG_INFO("GATT done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     advertising_init();
+    NRF_LOG_INFO("ADV done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     services_init();
+    NRF_LOG_INFO("SVC done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
     conn_params_init();
     peer_manager_init();
+    NRF_LOG_INFO("Init done", nrf_log_push(__TIME__));
+    NRF_LOG_FLUSH();
 
 #ifndef POWERUP
     // NORDIC: SET HIGH TX POWER ADV if not runnipng on battery
