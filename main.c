@@ -74,7 +74,7 @@
 #define USE_LTR329                      1
 #endif
 
-//#undef AUTO_DISCONNECT
+#undef AUTO_DISCONNECT
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -166,10 +166,10 @@
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(25, UNIT_1_25_MS)         /**< Minimum acceptable connection interval (20m seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(2000, UNIT_1_25_MS)         /**< Maximum acceptable connection interval (40m second). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(25, UNIT_1_25_MS)         /**< Minimum acceptable connection interval (25m seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(2000, UNIT_1_25_MS)       /**< Maximum acceptable connection interval (2s second). */
 #define SLAVE_LATENCY                   4                                       /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(26000, UNIT_10_MS)        /**< Connection supervisory timeout (10 seconds). */
+#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(26000, UNIT_10_MS)        /**< Connection supervisory timeout (26 seconds). */
 
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000)                  /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
@@ -185,9 +185,8 @@
 #define SEC_PARAM_MAX_KEY_SIZE          16                                      /**< Maximum encryption key size. */
 
 #define TEMP_TYPE_AS_CHARACTERISTIC     1                                       /**< Determines if temperature type is given as characteristic (1) or as a field of measurement (0). */
-#define MAX_READS                       30                                      /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
-//#define MAX_READS                       0                                     /**< Max number of sensor reads, then disconnect. 0 = Never disconnect */
-#define READS_UNTIL_UPDATE              5                                       /**< Update to GATT until after 4 reads */
+#define MAX_READS                       30                                      /**< Max number of sensor reads, then stop. 0 = Never stop. Disconnect if battery mode BATTERY=1 */
+#define READS_UNTIL_UPDATE              5                                       /**< Only update to GATT until after 5 reads */
 
 #ifdef POWERUP
 #define AUTO_DISCONNECT                                                         /**<Automatically disconnect after MAX_READS to save battery consumptions */
@@ -197,10 +196,10 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-#define TIMER_INTERVAL_ACCEL_UPDATE     APP_TIMER_TICKS(1000)                   // 1000 ms intervals
-#define TIMER_INTERVAL_FAST_UPDATE      APP_TIMER_TICKS(200)                    // 200ms fast interval update
-#define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(5000)                   // 1000 ms intervals
-#define LED_BLINK_INTERVAL              1                                       // LED blink duration in ms (1 ms)
+#define TIMER_INTERVAL_SLOW_UPDATE      APP_TIMER_TICKS(300000)                 // 5min interval for data reporting
+#define TIMER_INTERVAL_FAST_UPDATE      APP_TIMER_TICKS(200)                    // 200ms fast interval for data update
+#define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(5000)                   // 5s intervals
+#define LED_BLINK_INTERVAL              1                                       // Non-Battery mode LED blink duration in ms (1 ms)
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
@@ -743,6 +742,13 @@ static void application_timers_start(void)
     APP_ERROR_CHECK(err_code);
 }
 
+static void application_timers_slow_start(void)
+{
+    ret_code_t err_code;
+    err_code = app_timer_start(m_timer_accel_update_id, TIMER_INTERVAL_SLOW_UPDATE, NULL);
+    APP_ERROR_CHECK(err_code);
+}
+
 /**@brief Function for starting LED timer.
  */
 static void led_timers_start(void)
@@ -869,7 +875,7 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
     m_ble_envsense.conn_handle = p_gap_evt->conn_handle; 
 #ifndef POWERUP
     // NORDIC: SET HIGH TX POWER ADV if not runnipng on battery
-    uint32_t err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_ble_envsense.conn_handle, tx_power_level); 
+    err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_ble_envsense.conn_handle, tx_power_level); 
     APP_ERROR_CHECK(err_code); 
 #endif
     err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
@@ -1441,7 +1447,7 @@ int main(void)
 
 #ifndef POWERUP
     // NORDIC: SET HIGH TX POWER ADV if not runnipng on battery
-    uint32_t err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_advertising.adv_handle, tx_power_level); 
+    err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_advertising.adv_handle, tx_power_level); 
     APP_ERROR_CHECK(err_code); 
 #endif
 
@@ -1660,13 +1666,11 @@ int main(void)
                         all_read = false;
                         read_counts++;
                     }
-                    if (read_counts > READS_UNTIL_UPDATE)
-                        fastRead = false;
+
 
 #ifdef AUTO_DISCONNECT
                     if (MAX_READS > 0) {    // Auto-disconnect enabled
                         ret_code_t err_code;
-    //                    if (!start_accel_update_flag) read_counts++;
                         if (read_counts > MAX_READS) {
                             read_counts = 0;
                             start_accel_update_flag = false;
@@ -1679,8 +1683,17 @@ int main(void)
                         }
                     }
 #else
-                    if (read_counts > READS_UNTIL_UPDATE)
-                        read_counts = READS_UNTIL_UPDATE+1;
+                    if (MAX_READS > 0) {    // Auto-disconnect enabled
+                        if (read_counts > MAX_READS) {
+                            read_counts = 0;
+                            fastReadCount = 10; // anything > 5 (see #1718)
+                            fastRead = true;
+                            start_accel_update_flag = false;
+                            NRF_LOG_INFO("Enough sensor reads, change to slow mode"); NRF_LOG_FLUSH();
+                            application_timers_stop();
+                            application_timers_slow_start();
+                        }
+                    }
 #endif
                 } else {
 #if (USE_AP3216C)
@@ -1697,6 +1710,11 @@ int main(void)
 #endif
                 }
                 start_accel_update_flag = false;
+                if (fastRead && (fastReadCount == 0)) {
+                    NRF_LOG_INFO("Fast sensor reads, change to fast mode"); NRF_LOG_FLUSH();
+                    application_timers_stop();
+                    application_timers_start();
+                }
                 if (fastReadCount++ > 5)
                 {
                     fastReadCount = 0;
