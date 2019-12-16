@@ -119,7 +119,7 @@ uint32_t ap3216c_read_ambient(ap3216c_ambient_values_t * ap3216c_ambient_values)
     ap3216c_ambient_values->ambient_visible_value = visible;
     ap3216c_ambient_values->ambient_ir_value = ir;
     // Todo: cal lux with multiple range
-    ap3216c_ambient_values->ambient_lux_value = (uint16_t)(visible * AP3216C_RANGE_23360_RATION);
+    ap3216c_ambient_values->ambient_lux_value = (uint16_t)((float)visible * AP3216C_RANGE_23360_RATION);
 
     return NRF_SUCCESS;
 }
