@@ -168,11 +168,11 @@
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
 #define MIN_CONN_INTERVAL               MSEC_TO_UNITS(30, UNIT_1_25_MS)         /**< Minimum acceptable connection interval (25m seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(250, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (2s second). */
-#define SLAVE_LATENCY                   0                                       /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(6000, UNIT_10_MS)         /**< Connection supervisory timeout (26 seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(150, UNIT_1_25_MS)         /**< Maximum acceptable connection interval (75m second). */
+#define SLAVE_LATENCY                   2                                       /**< Slave latency. */
+#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (3 seconds). */
 
-#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
+#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(1000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000)                  /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    6                                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
@@ -198,10 +198,10 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-#define TIMER_INTERVAL_SLOW_UPDATE      APP_TIMER_TICKS(5000)                 // 5min interval for data reporting
+#define TIMER_INTERVAL_SLOW_UPDATE      APP_TIMER_TICKS(300000)                 // 5min interval for data reporting (5m)
 #define TIMER_INTERVAL_FAST_UPDATE      APP_TIMER_TICKS(100)                    // 200ms fast interval for data update
-#define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(5000)                   // 5s intervals
-#define LED_BLINK_INTERVAL              1                                       // Non-Battery mode LED blink duration in ms (1 ms)
+#define TIMER_INTERVAL_LED_FLASH        APP_TIMER_TICKS(10000)                  // 10s intervals
+#define LED_BLINK_INTERVAL              100                                     // Non-Battery mode LED blink duration in µs (100 µs)
 
 /*UART buffer size. */
 #define UART_TX_BUF_SIZE 32
@@ -225,7 +225,7 @@ static ble_envsense_t m_ble_envsense;
 static uint8_t read_counts = 0;
 static bool all_read = false;
 #ifdef POWERUP
-static int8_t tx_power_level = 0;
+static int8_t tx_power_level = -12;
 #else
 static int8_t tx_power_level = 4;
 #endif
@@ -271,13 +271,15 @@ void timer_accel_update_handler(void * p_context)
 #ifndef POWERUP
 void timer_led_handler(void * p_context)
 {
+    int delay = LED_BLINK_INTERVAL;
     if (m_isAdvertising) {
         LEDS_ON(BSP_LED_2_MASK);
+        delay = delay * 50;         // Blue LED need more time for the human eye to detect
     }
     if (m_conn_handle != BLE_CONN_HANDLE_INVALID) {
         LEDS_ON(BSP_LED_1_MASK);
     }
-    nrf_delay_ms(LED_BLINK_INTERVAL);
+    nrf_delay_us(delay);
     bsp_indication_set(BSP_INDICATE_IDLE);
 }
 #endif
@@ -904,19 +906,14 @@ static void on_connected(const ble_gap_evt_t * const p_gap_evt)
 
     m_conn_handle = p_gap_evt->conn_handle;
     m_ble_envsense.conn_handle = p_gap_evt->conn_handle; 
-#ifndef POWERUP
-    // NORDIC: SET HIGH TX POWER ADV if not runnipng on battery
-    err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_ble_envsense.conn_handle, tx_power_level); 
+    // NORDIC: SET  TX POWER ADV
+    err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, tx_power_level); 
     APP_ERROR_CHECK(err_code); 
-#endif
     err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
     APP_ERROR_CHECK(err_code);
     m_isAdvertising = false;
 
 #ifndef POWERUP
-    // NORDIC: SET HIGH TX POWER AFTER CONNECTING if not running on battery
-    err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, tx_power_level); 
-    APP_ERROR_CHECK(err_code); 
     // Refresh LED immediately
     timer_led_handler(0);
 #endif
@@ -1456,11 +1453,9 @@ int main(void)
     NRF_LOG_INFO("Init done", nrf_log_push(__TIME__));
     NRF_LOG_FLUSH();
 
-#ifndef POWERUP
-    // NORDIC: SET HIGH TX POWER ADV if not runnipng on battery
+    // NORDIC: SET  TX POWER ADV
     err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_advertising.adv_handle, tx_power_level); 
     APP_ERROR_CHECK(err_code); 
-#endif
 
     /** Comment the following if without L4 and L5 on custom board */
 #if defined(BASIC_SENSOR) || defined(SENSORTAG)
